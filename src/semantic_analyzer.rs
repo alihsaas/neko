@@ -85,3 +85,36 @@ impl SemanticAnalyzer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::Parser;
+
+    #[test]
+    #[should_panic]
+    fn should_catch_duplicate_decleration() {
+        let mut parser = Parser::new("let w = 20; let w = 20;");
+        let mut semantic_analyzer = SemanticAnalyzer::new();
+        let ast = parser.parse().unwrap();
+        semantic_analyzer.visit(&ast).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn should_catch_undefined_variable_assignment() {
+        let mut parser = Parser::new("w = 20;");
+        let mut semantic_analyzer = SemanticAnalyzer::new();
+        let ast = parser.parse().unwrap();
+        semantic_analyzer.visit(&ast).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn should_catch_usage_of_undefined_variable() {
+        let mut parser = Parser::new("20 + -w;");
+        let mut semantic_analyzer = SemanticAnalyzer::new();
+        let ast = parser.parse().unwrap();
+        semantic_analyzer.visit(&ast).unwrap();
+    }
+}
