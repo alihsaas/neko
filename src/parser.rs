@@ -1,10 +1,6 @@
 use std::vec;
 
-use crate::{ast::*,
- token::*,
- lexer::Lexer,
-};
-
+use crate::{ast::*, lexer::Lexer, token::*};
 
 type PResult = Result<Node, String>;
 

@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{ast::*,
- parser::Parser,
- semantic_analyzer::SemanticAnalyzer,
- token::*,
-};
+use crate::{ast::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
 
 #[derive(Debug)]
 pub struct Interpreter {
