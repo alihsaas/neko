@@ -81,7 +81,7 @@ jobs:
       with:
         tag_name: ${{ env.VERSION }}
         release_name: ${{ env.CHANGELOG_ENTRY }}
-        body: ${{ env.CHANGELOG_DESCRIPTION }}
+        body: ${{ env.DESCRIPTION }}
         draft: true
     - name: Upload Linux build
       uses: actions/upload-release-asset@v1
