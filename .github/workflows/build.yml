@@ -70,7 +70,6 @@ jobs:
 
         echo "CHANGELOG_ENTRY=$CHANGELOG_ENTRY" >> $GITHUB_ENV
 
-        echo "CHANGELOG_DESCRIPTION<<EOF" >> $GITHUB_ENV
         echo "$DESCRIPTION" >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
     - name: Create release
