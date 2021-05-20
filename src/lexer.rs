@@ -105,7 +105,7 @@ impl<'a> Lexer<'a> {
 
         self.tokens.push_back(Token::EndOfFile);
 
-        dbg!(&self.tokens);
+        // dbg!(&self.tokens);
 
         &self.tokens
     }

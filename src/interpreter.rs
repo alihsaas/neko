@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use crate::{ast::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
 
 #[derive(Debug)]
@@ -119,6 +118,6 @@ impl Interpreter {
         let mut parser = Parser::new(text);
         let ast = parser.parse()?;
         self.semantic_analyzer.visit(&ast)?;
-        self.visit(dbg!(&&ast))
+        self.visit(&ast)
     }
 }

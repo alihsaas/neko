@@ -1,7 +1,4 @@
-use crate::{
-    ast::{AssignmentExpr, Node, VariabeDecleration},
-    symbol::*,
-};
+use crate::{ast::*, symbol::*};
 use std::collections::HashMap;
 
 type SResult = Result<(), String>;
@@ -53,16 +50,27 @@ impl SemanticAnalyzer {
         }
     }
 
+    fn visit_bin_operator(&mut self, node: &BinOperator) -> SResult {
+        self.visit(&node.right)?;
+        self.visit(&node.left)?;
+        Ok(())
+    }
+
+    fn visit_unary_operation(&mut self, node: &UnaryOperator) -> SResult {
+        self.visit(&node.expression)?;
+        Ok(())
+    }
+
     fn visit_expression(&mut self, node: &Node) -> SResult {
         match node {
-            Node::BinOperator(_) => Ok(()),
+            Node::BinOperator(node) => self.visit_bin_operator(node),
             Node::Number(_) => Ok(()),
             Node::String(iden) => self
                 .symbol_table
                 .get(iden)
                 .and(Some(()))
                 .ok_or(format!("{} is not defined", iden)),
-            Node::UnaryOperator(_) => Ok(()),
+            Node::UnaryOperator(node) => self.visit_unary_operation(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
             _ => Err(String::from("Invalid Syntax")),
         }
