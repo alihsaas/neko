@@ -1,0 +1,115 @@
+name: Build neko
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+jobs:
+  build_windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build (All features)
+      run: |
+        cd neko
+        cargo build --locked --release --all-features
+    - name: Upload neko
+      uses: actions/upload-artifact@v1
+      with:
+        name: neko-windows
+        path: ./target/release/neko.exe
+  build_mac:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Rust
+      run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - name: Build (All features)
+      run: |
+        source $HOME/.cargo/env
+        cd neko
+        cargo build --locked --release --all-features
+    - name: Upload neko
+      uses: actions/upload-artifact@v1
+      with:
+        name: neko-macos
+        path: ./target/release/neko
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build (All features)
+      run: |
+        cd neko
+        cargo build --locked --release --all-features
+    - name: Upload neko
+      uses: actions/upload-artifact@v1
+      with:
+        name: neko-linux
+        path: ./target/release/neko
+  release:
+    runs-on: ubuntu-latest
+    needs: ['build_windows', 'build_mac', 'build_linux']
+    if: contains(github.event.head_commit.message, '[release]')
+    steps:
+    - uses: actions/checkout@v1
+    - name: Download artifacts
+      uses: actions/download-artifact@v2
+      with:
+        path: artifacts
+    - run: |
+        zip -rj neko-linux.zip ./artifacts/neko-linux/*
+        zip -rj neko-macos.zip ./artifacts/neko-macos/*
+        zip -rj neko-windows.zip ./artifacts/neko-windows/*
+
+        VERSION=`grep -Po '(?<=^version = ")([^"]+)' ./neko/Cargo.toml`
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+    - name: Get changelog
+      run: |
+        CHANGELOG_ENTRY=`grep --color=never -m 1 -Po '## \K(\[[0-9\.]+\])' CHANGELOG.md`
+        DESCRIPTION=`bash ./extract-changelog.sh $CHANGELOG_ENTRY`
+
+        echo "CHANGELOG_ENTRY=$CHANGELOG_ENTRY" >> $GITHUB_ENV
+
+        echo "CHANGELOG_DESCRIPTION<<EOF" >> $GITHUB_ENV
+        echo "$DESCRIPTION" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.VERSION }}
+        release_name: ${{ env.CHANGELOG_ENTRY }}
+        body: ${{ env.CHANGELOG_DESCRIPTION }}
+        draft: true
+    - name: Upload Linux build
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./neko-linux.zip
+        asset_name: neko-${{ env.VERSION }}-linux.zip
+        asset_content_type: application/zip
+    - name: Upload Windows build
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./neko-windows.zip
+        asset_name: neko-${{ env.VERSION }}-windows.zip
+        asset_content_type: application/zip
+    - name: Upload Mac build
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./neko-macos.zip
+        asset_name: neko-${{ env.VERSION }}-macos.zip
+        asset_content_type: application/zip
