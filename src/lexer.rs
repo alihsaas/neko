@@ -35,6 +35,8 @@ impl<'a> Lexer<'a> {
                     let word = self.parse_word(&c.to_string());
                     match word.as_str() {
                         "let" => self.tokens.push_back(Token::Keyword(Keyword::Let)),
+                        "true" => self.tokens.push_back(Token::Boolean(true)),
+                        "false" => self.tokens.push_back(Token::Boolean(false)),
                         _ => self.tokens.push_back(Token::String(word)),
                     }
                 }
@@ -256,6 +258,20 @@ fn should_lex_compound_assignments() {
             Token::Operator(Operator::DivEqual),
             Token::Operator(Operator::ModulusEqual),
             Token::Operator(Operator::ExponentEqual),
+            Token::EndOfFile,
+        ]
+    );
+}
+
+#[test]
+fn should_lex_booleans() {
+    let mut lexer = Lexer::new("true false");
+    lexer.lex();
+    assert_eq!(
+        lexer.tokens,
+        [
+            Token::Boolean(true),
+            Token::Boolean(false),
             Token::EndOfFile,
         ]
     );

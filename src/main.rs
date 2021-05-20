@@ -27,8 +27,8 @@ fn main() {
 
         match interpreter.interpret(&input) {
             Ok(result) => match result {
-                Value::Number(num) => println!("{}", num),
                 Value::NoValue => (),
+                val => println!("{:?}", val),
             },
             Err(err) => eprintln!("ERROR: {}", err),
         };

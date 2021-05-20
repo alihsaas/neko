@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::{ast::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Interpreter {
@@ -10,6 +10,7 @@ pub struct Interpreter {
 #[derive(Debug, Copy, Clone)]
 pub enum Value {
     Number(f64),
+    Boolean(bool),
     NoValue,
 }
 
@@ -67,8 +68,8 @@ impl Interpreter {
 
         for node in nodes {
             match self.visit(&node)? {
-                Value::Number(num) => result = Value::Number(num),
                 Value::NoValue => (),
+                val => result = val,
             }
         }
 
@@ -88,6 +89,7 @@ impl Interpreter {
         match node {
             Node::BinOperator(node) => self.visit_bin_operator(node),
             Node::Number(num) => Ok(Value::Number(*num)),
+            Node::Boolean(boolean) => Ok(Value::Boolean(*boolean)),
             Node::String(iden) => self
                 .globals
                 .get(iden)

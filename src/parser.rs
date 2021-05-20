@@ -30,6 +30,7 @@ impl<'a> Parser<'a> {
         match token {
             Token::Number(num) => Ok(Node::Number(num)),
             Token::String(iden) => Ok(Node::String(iden)),
+            Token::Boolean(boolean) => Ok(Node::Boolean(boolean)),
             Token::Operator(Operator::Plus) | Token::Operator(Operator::Minus) => {
                 Ok(Node::UnaryOperator(Box::new(UnaryOperator {
                     operator: extract_op(token)?,
@@ -149,7 +150,7 @@ impl<'a> Parser<'a> {
             | Token::Operator(Operator::DivEqual)
             | Token::Operator(Operator::ExponentEqual)
             | Token::Operator(Operator::ModulusEqual) => {
-                if let Node::String(identifier) = expression.clone() {
+                if let Node::String(identifier) = &expression {
                     let operator = self.lexer.next();
                     let mut value = self.expression()?;
                     value = match operator {
@@ -209,7 +210,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expr_stmt(&mut self) -> PResult {
+    fn expression_statment(&mut self) -> PResult {
         let expr = self.expression()?;
         self.eat(Token::Semicolon)?;
         Ok(Node::Expression(Box::new(expr)))
@@ -248,7 +249,7 @@ impl<'a> Parser<'a> {
 
         match token {
             Token::Keyword(Keyword::Let) => self.variable_decleration(),
-            _ => self.expr_stmt(),
+            _ => self.expression_statment(),
         }
     }
 

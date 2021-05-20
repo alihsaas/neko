@@ -4,6 +4,7 @@ use std::fmt;
 pub enum Token {
     Number(f64),
     String(String),
+    Boolean(bool),
     Operator(Operator),
     Keyword(Keyword),
     LParen,
