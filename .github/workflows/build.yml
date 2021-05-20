@@ -61,7 +61,7 @@ jobs:
         zip -rj neko-macos.zip ./artifacts/neko-macos/*
         zip -rj neko-windows.zip ./artifacts/neko-windows/*
 
-        VERSION=`grep -Po '(?<=^version = ")([^"]+)' ./neko/Cargo.toml`
+        VERSION=`grep -Po '(?<=^version = ")([^"]+)' ./Cargo.toml`
         echo "VERSION=$VERSION" >> $GITHUB_ENV
     - name: Get changelog
       run: |
