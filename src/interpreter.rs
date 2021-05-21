@@ -28,7 +28,7 @@ fn convert_f64_usize(x: f64) -> Result<usize, String> {
 
 fn to_bool(val: &Value) -> bool {
     match val {
-        Value::Number(num) => !num.eq(&0.0),
+        Value::Number(num) => num.ne(&0.0),
         Value::String(string) => !string.is_empty(),
         Value::Boolean(boolean) => *boolean,
         Value::NoValue => false,
@@ -213,4 +213,35 @@ impl Interpreter {
         self.semantic_analyzer.visit(&ast)?;
         self.visit(&ast)
     }
+}
+
+#[test]
+fn should_eval_math_expression() {
+    let mut interpreter = Interpreter::new();
+    let result = interpreter.interpret("((20 + 40) ** 20 * 2 - 10) / 10 % 100;").unwrap();
+    assert_eq!(result, Value::Number(56.0))
+}
+
+#[test]
+fn should_handle_var_deceration() {
+    let mut interpreter = Interpreter::new();
+    let result = interpreter.interpret("let foo = 'Hello World!'; foo;").unwrap();
+    assert_eq!(result, Value::String(String::from("Hello World!")))
+}
+
+#[test]
+fn should_handle_var_assignment() {
+    let mut interpreter = Interpreter::new();
+    let result = interpreter.interpret("let foo = 'Hello World'; foo += '!' * 10;").unwrap();
+    assert_eq!(result, Value::String(String::from("Hello World!!!!!!!!!!")))
+}
+
+
+#[test]
+fn should_handle_comparison() {
+    let mut interpreter = Interpreter::new();
+    assert_eq!(interpreter.interpret("let foo = 20; foo == 20;").unwrap(), Value::Boolean(true));
+    assert_eq!(interpreter.interpret("let foo2 = 20; foo2 != 20;").unwrap(), Value::Boolean(false));
+    assert_eq!(interpreter.interpret("let foo3 = 20; foo3 >= 10;").unwrap(), Value::Boolean(true));
+    assert_eq!(interpreter.interpret("let foo4 = 20; foo4 < 20;").unwrap(), Value::Boolean(false))
 }
