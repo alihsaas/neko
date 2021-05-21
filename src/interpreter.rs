@@ -34,56 +34,39 @@ impl Interpreter {
         }
     }
 
-    fn is_number_operation(&mut self, node: &BinOperator) -> Result<bool, String> {
-        if let (Value::Number(_), Value::Number(_)) =
-            (self.visit(&node.left)?, self.visit(&node.right)?)
-        {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    fn string_operation(
-        &mut self,
-        node: &BinOperator,
-        callback: fn(&str, f64) -> Result<String, String>,
-    ) -> IResult {
-        match (self.visit(&node.left)?, self.visit(&node.right)?) {
-            (Value::String(a), Value::Number(b)) => Ok(Value::String(callback(a.as_str(), b)?)),
-            (Value::Number(a), Value::String(b)) => Ok(Value::String(callback(b.as_str(), a)?)),
-            _ => Err(format!(
-                "Expected Number for binary {:?}, got {:?}, {:?}",
-                node.operator, node.left, node.right
-            )),
-        }
-    }
-
     fn number_operation(&mut self, node: &BinOperator, callback: fn(f64, f64) -> f64) -> IResult {
         match (self.visit(&node.left)?, self.visit(&node.right)?) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(callback(a, b))),
-            _ => Err(format!(
+            (a, b) => Err(format!(
                 "Expected Number for binary {:?}, got {:?}, {:?}",
-                node.operator, node.left, node.right
+                node.operator, a, b
             )),
         }
     }
 
     fn visit_bin_operator(&mut self, node: &BinOperator) -> IResult {
         match node.operator {
-            Operator::Plus => self.number_operation(node, |a, b| a + b),
+            Operator::Plus => match (self.visit(&node.left)?, self.visit(&node.right)?) {
+                (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+                (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
+                (a, b) => Err(format!(
+                    "Mismatched types for binary Add, got {:?} and {:?}",
+                    a, b
+                )),
+            },
             Operator::Minus => self.number_operation(node, |a, b| a - b),
-            Operator::Mul => {
-                if self.is_number_operation(node)? {
-                    self.number_operation(node, |a, b| a * b)
-                } else {
-                    self.string_operation(node, |a, b| {
-                        Ok(a.repeat(convert_f64_usize(b).or(Err(String::from(
-                            "Can't multiply sequence by non-positive int of type float or negative int",
-                        )))?))
-                    })
-                }
-            }
+            Operator::Mul => match (self.visit(&node.left)?, self.visit(&node.right)?) {
+                (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
+                (Value::String(a), Value::Number(b)) | (Value::Number(b), Value::String(a)) => Ok(
+                    Value::String(a.repeat(convert_f64_usize(b).or(Err(String::from(
+                        "Can't multiply sequence by non-positive int of type float or negative int",
+                    )))?)),
+                ),
+                (a, b) => Err(format!(
+                    "Mismatched types for binary Mul, got {:?} and {:?}",
+                    a, b
+                )),
+            },
             Operator::Div => self.number_operation(node, |a, b| a / b),
             Operator::Modulus => self.number_operation(node, |a, b| a % b),
             Operator::Exponent => self.number_operation(node, |a, b| a.powf(b)),
