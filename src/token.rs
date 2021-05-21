@@ -35,8 +35,8 @@ pub enum Operator {
 
     LessThan,
     LessThanOrEqual,
-    GreatThan,
-    GreatThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
 
     DoubleEqual,
     NotEqual,

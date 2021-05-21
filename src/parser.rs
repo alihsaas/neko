@@ -151,19 +151,19 @@ impl<'a> Parser<'a> {
 
         loop {
             match self.lexer.peek() {
-                Token::Operator(Operator::GreatThan) => {
+                Token::Operator(Operator::GreaterThan) => {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: Operator::GreatThan,
+                        operator: Operator::GreaterThan,
                         right: self.addition_expr()?,
                     }))
                 }
-                Token::Operator(Operator::GreatThanOrEqual) => {
+                Token::Operator(Operator::GreaterThanOrEqual) => {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: Operator::GreatThanOrEqual,
+                        operator: Operator::GreaterThanOrEqual,
                         right: self.addition_expr()?,
                     }))
                 }
@@ -460,7 +460,7 @@ fn should_parse_comparision() {
             })))),
             Node::Expression(Box::new(Node::BinOperator(Box::new(BinOperator {
                 left: Node::Identifier(String::from("foo")),
-                operator: Operator::GreatThanOrEqual,
+                operator: Operator::GreaterThanOrEqual,
                 right: Node::Number(2.0),
             })))),
             Node::Expression(Box::new(Node::BinOperator(Box::new(BinOperator {

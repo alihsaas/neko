@@ -104,10 +104,10 @@ impl Interpreter {
             Operator::Exponent => {
                 self.number_operation(node.operator, left, right, |a, b| a.powf(b))
             }
-            Operator::Equal => Ok(Value::Boolean(left == right)),
+            Operator::DoubleEqual => Ok(Value::Boolean(left == right)),
             Operator::NotEqual => Ok(Value::Boolean(left != right)),
-            Operator::GreatThan => self.bool_operation(node.operator, left, right, |a, b| a > b),
-            Operator::GreatThanOrEqual => {
+            Operator::GreaterThan => self.bool_operation(node.operator, left, right, |a, b| a > b),
+            Operator::GreaterThanOrEqual => {
                 self.bool_operation(node.operator, left, right, |a, b| a >= b)
             }
             Operator::LessThan => self.bool_operation(node.operator, left, right, |a, b| a < b),

@@ -106,8 +106,8 @@ impl<'a> Lexer<'a> {
                     let token = self.match_char(
                         peek,
                         '=',
-                        Token::Operator(Operator::GreatThanOrEqual),
-                        Token::Operator(Operator::GreatThan),
+                        Token::Operator(Operator::GreaterThanOrEqual),
+                        Token::Operator(Operator::GreaterThan),
                     );
                     self.tokens.push_back(token)
                 }
@@ -352,10 +352,10 @@ fn should_lex_bool_operations() {
         [
             Token::Operator(Operator::DoubleEqual),
             Token::Operator(Operator::NotEqual),
-            Token::Operator(Operator::GreatThanOrEqual),
+            Token::Operator(Operator::GreaterThanOrEqual),
             Token::Operator(Operator::LessThanOrEqual),
             Token::Operator(Operator::LessThan),
-            Token::Operator(Operator::GreatThan),
+            Token::Operator(Operator::GreaterThan),
             Token::Operator(Operator::Not),
             Token::EndOfFile,
         ]
