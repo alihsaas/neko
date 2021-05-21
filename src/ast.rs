@@ -31,6 +31,7 @@ pub enum Node {
     Number(f64),
     String(String),
     Boolean(bool),
+    Identifier(String),
     Compound(Vec<Node>),
     VariabeDecleration(Box<VariabeDecleration>),
     AssignmentExpr(Box<AssignmentExpr>),

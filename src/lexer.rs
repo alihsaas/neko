@@ -37,7 +37,7 @@ impl<'a> Lexer<'a> {
                         "let" => self.tokens.push_back(Token::Keyword(Keyword::Let)),
                         "true" => self.tokens.push_back(Token::Boolean(true)),
                         "false" => self.tokens.push_back(Token::Boolean(false)),
-                        _ => self.tokens.push_back(Token::String(word)),
+                        _ => self.tokens.push_back(Token::Identifier(word)),
                     }
                 }
 
@@ -97,6 +97,10 @@ impl<'a> Lexer<'a> {
                     );
                     self.tokens.push_back(token)
                 }
+                '"' | '\'' => {
+                    let string = self.parse_string(&c.to_string());
+                    self.tokens.push_back(Token::String(string));
+                }
                 '=' => self.tokens.push_back(Token::Operator(Operator::Equal)),
                 '(' => self.tokens.push_back(Token::LParen),
                 ')' => self.tokens.push_back(Token::RParen),
@@ -106,8 +110,6 @@ impl<'a> Lexer<'a> {
         }
 
         self.tokens.push_back(Token::EndOfFile);
-
-        // dbg!(&self.tokens);
 
         &self.tokens
     }
@@ -125,6 +127,20 @@ impl<'a> Lexer<'a> {
         } else {
             unmatched
         }
+    }
+
+    fn parse_string(&mut self, start: &str) -> String {
+        let mut buffer = String::new();
+
+        while let Some(c) = self.char_iter.next() {
+            if c.to_string() == start {
+                break;
+            } else {
+                buffer.push(c)
+            }
+        }
+
+        buffer
     }
 
     fn parse_word(&mut self, text: &str) -> String {
@@ -238,8 +254,8 @@ fn should_lex_words() {
         lexer.tokens,
         [
             Token::Keyword(Keyword::Let),
-            Token::String(String::from("some_word")),
-            Token::String(String::from("some24_4")),
+            Token::Identifier(String::from("some_word")),
+            Token::Identifier(String::from("some24_4")),
             Token::EndOfFile,
         ]
     );
@@ -272,6 +288,20 @@ fn should_lex_booleans() {
         [
             Token::Boolean(true),
             Token::Boolean(false),
+            Token::EndOfFile,
+        ]
+    );
+}
+
+#[test]
+fn should_lex_strings() {
+    let mut lexer = Lexer::new("'hello world' \"hello world2\"");
+    lexer.lex();
+    assert_eq!(
+        lexer.tokens,
+        [
+            Token::String(String::from("hello world")),
+            Token::String(String::from("hello world2")),
             Token::EndOfFile,
         ]
     );

@@ -11,7 +11,6 @@ mod token;
 
 fn main() {
     let mut interpreter = Interpreter::new();
-
     loop {
         let mut input = String::new();
 

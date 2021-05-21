@@ -5,7 +5,7 @@ type SResult = Result<(), String>;
 
 #[derive(Debug)]
 pub struct SemanticAnalyzer {
-    symbol_table: HashMap<String, Symbol>,
+    pub symbol_table: HashMap<String, Symbol>,
 }
 
 impl SemanticAnalyzer {
@@ -65,7 +65,9 @@ impl SemanticAnalyzer {
         match node {
             Node::BinOperator(node) => self.visit_bin_operator(node),
             Node::Number(_) => Ok(()),
-            Node::String(iden) => self
+            Node::Boolean(_) => Ok(()),
+            Node::String(_) => Ok(()),
+            Node::Identifier(iden) => self
                 .symbol_table
                 .get(iden)
                 .and(Some(()))

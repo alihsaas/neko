@@ -7,20 +7,55 @@ pub struct Interpreter {
     semantic_analyzer: SemanticAnalyzer,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
+    String(String),
     NoValue,
 }
 
 type IResult = Result<Value, String>;
+
+fn convert_f64_usize(x: f64) -> Result<usize, String> {
+    let result = x as usize;
+    if result as f64 != x {
+        Err(String::from("Cannot convert"))
+    } else {
+        Ok(result)
+    }
+}
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
             globals: HashMap::new(),
             semantic_analyzer: SemanticAnalyzer::new(),
+        }
+    }
+
+    fn is_number_operation(&mut self, node: &BinOperator) -> Result<bool, String> {
+        if let (Value::Number(_), Value::Number(_)) =
+            (self.visit(&node.left)?, self.visit(&node.right)?)
+        {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn string_operation(
+        &mut self,
+        node: &BinOperator,
+        callback: fn(&str, f64) -> Result<String, String>,
+    ) -> IResult {
+        match (self.visit(&node.left)?, self.visit(&node.right)?) {
+            (Value::String(a), Value::Number(b)) => Ok(Value::String(callback(a.as_str(), b)?)),
+            (Value::Number(a), Value::String(b)) => Ok(Value::String(callback(b.as_str(), a)?)),
+            _ => Err(format!(
+                "Expected Number for binary {:?}, got {:?}, {:?}",
+                node.operator, node.left, node.right
+            )),
         }
     }
 
@@ -38,7 +73,17 @@ impl Interpreter {
         match node.operator {
             Operator::Plus => self.number_operation(node, |a, b| a + b),
             Operator::Minus => self.number_operation(node, |a, b| a - b),
-            Operator::Mul => self.number_operation(node, |a, b| a * b),
+            Operator::Mul => {
+                if self.is_number_operation(node)? {
+                    self.number_operation(node, |a, b| a * b)
+                } else {
+                    self.string_operation(node, |a, b| {
+                        Ok(a.repeat(convert_f64_usize(b).or(Err(String::from(
+                            "Can't multiply sequence by non-positive int of type float or negative int",
+                        )))?))
+                    })
+                }
+            }
             Operator::Div => self.number_operation(node, |a, b| a / b),
             Operator::Modulus => self.number_operation(node, |a, b| a % b),
             Operator::Exponent => self.number_operation(node, |a, b| a.powf(b)),
@@ -78,7 +123,13 @@ impl Interpreter {
 
     fn visit_variable_decleration(&mut self, node: &VariabeDecleration) -> IResult {
         let value = match &node.value {
-            Some(node) => self.visit(&node)?,
+            Some(value_node) => match self.visit(value_node) {
+                Ok(val) => val,
+                Err(err) => {
+                    self.semantic_analyzer.symbol_table.remove(&node.identifier);
+                    return Err(err);
+                }
+            },
             None => Value::NoValue,
         };
         self.globals.insert(node.identifier.clone(), value);
@@ -90,10 +141,11 @@ impl Interpreter {
             Node::BinOperator(node) => self.visit_bin_operator(node),
             Node::Number(num) => Ok(Value::Number(*num)),
             Node::Boolean(boolean) => Ok(Value::Boolean(*boolean)),
-            Node::String(iden) => self
+            Node::String(string) => Ok(Value::String(string.clone())),
+            Node::Identifier(iden) => self
                 .globals
                 .get(iden)
-                .map(|val| *val)
+                .map(|val| val.clone())
                 .ok_or(format!("{} is not defined", iden)),
             Node::UnaryOperator(node) => self.visit_unary_operator(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
@@ -103,8 +155,8 @@ impl Interpreter {
 
     fn visit_assignment(&mut self, node: &AssignmentExpr) -> IResult {
         let value = self.visit(&node.value)?;
-        self.globals.insert(node.identifier.clone(), value);
-        Ok(value)
+        self.globals.insert(node.identifier.clone(), value.clone());
+        Ok(value.clone())
     }
 
     fn visit(&mut self, node: &Node) -> IResult {

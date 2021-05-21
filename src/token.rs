@@ -5,6 +5,8 @@ pub enum Token {
     Number(f64),
     String(String),
     Boolean(bool),
+    Identifier(String),
+
     Operator(Operator),
     Keyword(Keyword),
     LParen,

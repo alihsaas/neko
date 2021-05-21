@@ -29,7 +29,8 @@ impl<'a> Parser<'a> {
 
         match token {
             Token::Number(num) => Ok(Node::Number(num)),
-            Token::String(iden) => Ok(Node::String(iden)),
+            Token::Identifier(iden) => Ok(Node::Identifier(iden)),
+            Token::String(string) => Ok(Node::String(string)),
             Token::Boolean(boolean) => Ok(Node::Boolean(boolean)),
             Token::Operator(Operator::Plus) | Token::Operator(Operator::Minus) => {
                 Ok(Node::UnaryOperator(Box::new(UnaryOperator {
@@ -150,7 +151,7 @@ impl<'a> Parser<'a> {
             | Token::Operator(Operator::DivEqual)
             | Token::Operator(Operator::ExponentEqual)
             | Token::Operator(Operator::ModulusEqual) => {
-                if let Node::String(identifier) = &expression {
+                if let Node::Identifier(identifier) = &expression {
                     let operator = self.lexer.next();
                     let mut value = self.expression()?;
                     value = match operator {
@@ -220,8 +221,8 @@ impl<'a> Parser<'a> {
         self.eat(Token::Keyword(Keyword::Let))?;
 
         match self.lexer.peek() {
-            Token::String(identifier) => {
-                self.eat(Token::String(identifier.clone()))?;
+            Token::Identifier(identifier) => {
+                self.eat(Token::Identifier(identifier.clone()))?;
                 match self.lexer.next() {
                     Token::Operator(Operator::Equal) => {
                         let node = Node::VariabeDecleration(Box::new(VariabeDecleration {
@@ -288,16 +289,20 @@ fn should_parse_variable_decleration() {
 
 #[test]
 fn shouldnt_parse_variable_assignment() {
-    let mut parser = Parser::new("foo = 10;");
+    let mut parser = Parser::new("foo = 10; foo = true;");
     let result = parser.parse().unwrap();
     assert_eq!(
         result,
-        Node::Compound(vec![Node::Expression(Box::new(Node::AssignmentExpr(
-            Box::new(AssignmentExpr {
+        Node::Compound(vec![
+            Node::Expression(Box::new(Node::AssignmentExpr(Box::new(AssignmentExpr {
                 identifier: String::from("foo"),
                 value: Node::Number(10.0),
-            })
-        )))])
+            })))),
+            Node::Expression(Box::new(Node::AssignmentExpr(Box::new(AssignmentExpr {
+                identifier: String::from("foo"),
+                value: Node::Boolean(true),
+            })))),
+        ])
     );
 }
 
@@ -334,7 +339,7 @@ fn should_parse_compound_assignments() {
             Node::Expression(Box::new(Node::AssignmentExpr(Box::new(AssignmentExpr {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
-                    left: Node::String(String::from("foo"),),
+                    left: Node::Identifier(String::from("foo"),),
                     operator: Operator::Plus,
                     right: Node::Number(20.0,),
                 })),
@@ -342,7 +347,7 @@ fn should_parse_compound_assignments() {
             Node::Expression(Box::new(Node::AssignmentExpr(Box::new(AssignmentExpr {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
-                    left: Node::String(String::from("foo"),),
+                    left: Node::Identifier(String::from("foo"),),
                     operator: Operator::Div,
                     right: Node::Number(2.0,),
                 })),
@@ -350,7 +355,7 @@ fn should_parse_compound_assignments() {
             Node::Expression(Box::new(Node::AssignmentExpr(Box::new(AssignmentExpr {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
-                    left: Node::String(String::from("foo"),),
+                    left: Node::Identifier(String::from("foo"),),
                     operator: Operator::Exponent,
                     right: Node::Number(2.0,),
                 })),
