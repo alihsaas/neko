@@ -107,7 +107,7 @@ impl<'a> Lexer<'a> {
                         peek,
                         '=',
                         Token::Operator(Operator::GreatThanOrEqual),
-                        Token::Operator(Operator::GreatThan)
+                        Token::Operator(Operator::GreatThan),
                     );
                     self.tokens.push_back(token)
                 }
@@ -116,7 +116,7 @@ impl<'a> Lexer<'a> {
                         peek,
                         '=',
                         Token::Operator(Operator::LessThanOrEqual),
-                        Token::Operator(Operator::LessThan)
+                        Token::Operator(Operator::LessThan),
                     );
                     self.tokens.push_back(token)
                 }
@@ -125,7 +125,7 @@ impl<'a> Lexer<'a> {
                         peek,
                         '=',
                         Token::Operator(Operator::DoubleEqual),
-                        Token::Operator(Operator::Equal)
+                        Token::Operator(Operator::Equal),
                     );
                     self.tokens.push_back(token)
                 }
@@ -134,7 +134,7 @@ impl<'a> Lexer<'a> {
                         peek,
                         '=',
                         Token::Operator(Operator::NotEqual),
-                        Token::Unknown
+                        Token::Unknown,
                     );
                     self.tokens.push_back(token)
                 }

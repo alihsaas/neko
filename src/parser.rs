@@ -32,12 +32,12 @@ impl<'a> Parser<'a> {
             Token::Identifier(iden) => Ok(Node::Identifier(iden)),
             Token::String(string) => Ok(Node::String(string)),
             Token::Boolean(boolean) => Ok(Node::Boolean(boolean)),
-            Token::Operator(Operator::Plus) | Token::Operator(Operator::Minus) | Token::Operator(Operator::Not) => {
-                Ok(Node::UnaryOperator(Box::new(UnaryOperator {
-                    operator: extract_op(token)?,
-                    expression: self.term()?,
-                })))
-            }
+            Token::Operator(Operator::Plus)
+            | Token::Operator(Operator::Minus)
+            | Token::Operator(Operator::Not) => Ok(Node::UnaryOperator(Box::new(UnaryOperator {
+                operator: extract_op(token)?,
+                expression: self.term()?,
+            }))),
             Token::LParen => {
                 let result = self.expression();
                 let current_token = self.lexer.next();
@@ -54,17 +54,18 @@ impl<'a> Parser<'a> {
     fn exponent_expr(&mut self) -> PResult {
         let mut node = self.term()?;
 
-        while is_exponent(self.lexer.peek()) {
-            let token = self.lexer.next();
+        loop {
+            let token = self.lexer.peek();
             match token {
                 Token::Operator(Operator::Exponent) => {
+                    self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
                         operator: extract_op(token)?,
                         right: self.term()?,
                     }))
                 }
-                _ => return Err(format!("Expected '**', got {}", token)),
+                _ => break,
             }
         }
 
@@ -74,10 +75,11 @@ impl<'a> Parser<'a> {
     fn addition_expr(&mut self) -> PResult {
         let mut node = self.multiplication_expr()?;
 
-        while is_addsub(self.lexer.peek()) {
-            let token = self.lexer.next();
+        loop {
+            let token = self.lexer.peek();
             match token {
                 Token::Operator(Operator::Plus) => {
+                    self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
                         operator: extract_op(token)?,
@@ -85,13 +87,14 @@ impl<'a> Parser<'a> {
                     }))
                 }
                 Token::Operator(Operator::Minus) => {
+                    self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
                         operator: extract_op(token)?,
                         right: self.multiplication_expr()?,
                     }))
                 }
-                _ => return Err(format!("Expected '*' or '/', got {}", token)),
+                _ => break,
             }
         }
 
@@ -101,10 +104,11 @@ impl<'a> Parser<'a> {
     fn multiplication_expr(&mut self) -> PResult {
         let mut node = self.exponent_expr()?;
 
-        while is_muldivmod(self.lexer.peek()) {
-            let token = self.lexer.next();
+        loop {
+            let token = self.lexer.peek();
             match token {
                 Token::Operator(Operator::Mul) => {
+                    self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
                         operator: extract_op(token)?,
@@ -112,6 +116,7 @@ impl<'a> Parser<'a> {
                     }))
                 }
                 Token::Operator(Operator::Div) => {
+                    self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
                         operator: extract_op(token)?,
@@ -119,13 +124,14 @@ impl<'a> Parser<'a> {
                     }))
                 }
                 Token::Operator(Operator::Modulus) => {
+                    self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
                         operator: extract_op(token)?,
                         right: self.exponent_expr()?,
                     }))
                 }
-                _ => return Err(format!("Expected '*' or '/', got {}", token)),
+                _ => break,
             }
         }
 

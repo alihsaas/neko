@@ -43,7 +43,13 @@ impl Interpreter {
         }
     }
 
-    fn number_operation(&mut self, operator: Operator, left: Value, right: Value, callback: fn(f64, f64) -> f64) -> IResult {
+    fn number_operation(
+        &mut self,
+        operator: Operator,
+        left: Value,
+        right: Value,
+        callback: fn(f64, f64) -> f64,
+    ) -> IResult {
         match (left, right) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(callback(a, b))),
             (a, b) => Err(format!(
@@ -53,7 +59,13 @@ impl Interpreter {
         }
     }
 
-    fn bool_operation(&mut self, operator: Operator, left: Value, right: Value, callback: fn(f64, f64) -> bool) -> IResult {
+    fn bool_operation(
+        &mut self,
+        operator: Operator,
+        left: Value,
+        right: Value,
+        callback: fn(f64, f64) -> bool,
+    ) -> IResult {
         match (left, right) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(callback(a, b))),
             (a, b) => Err(format!(
@@ -89,13 +101,19 @@ impl Interpreter {
             },
             Operator::Div => self.number_operation(node.operator, left, right, |a, b| a / b),
             Operator::Modulus => self.number_operation(node.operator, left, right, |a, b| a % b),
-            Operator::Exponent => self.number_operation(node.operator, left, right, |a, b| a.powf(b)),
+            Operator::Exponent => {
+                self.number_operation(node.operator, left, right, |a, b| a.powf(b))
+            }
             Operator::Equal => Ok(Value::Boolean(left == right)),
             Operator::NotEqual => Ok(Value::Boolean(left != right)),
             Operator::GreatThan => self.bool_operation(node.operator, left, right, |a, b| a > b),
-            Operator::GreatThanOrEqual => self.bool_operation(node.operator, left, right, |a, b| a >= b),
+            Operator::GreatThanOrEqual => {
+                self.bool_operation(node.operator, left, right, |a, b| a >= b)
+            }
             Operator::LessThan => self.bool_operation(node.operator, left, right, |a, b| a < b),
-            Operator::LessThanOrEqual => self.bool_operation(node.operator, left, right, |a, b| a <= b),
+            Operator::LessThanOrEqual => {
+                self.bool_operation(node.operator, left, right, |a, b| a <= b)
+            }
             _ => Err(format!("Expected Operator, got {}.", node)),
         }
     }

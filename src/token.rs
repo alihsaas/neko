@@ -49,20 +49,6 @@ pub enum Keyword {
     Let,
 }
 
-pub fn is_addsub(token: Token) -> bool {
-    token == Token::Operator(Operator::Plus) || token == Token::Operator(Operator::Minus)
-}
-
-pub fn is_muldivmod(token: Token) -> bool {
-    token == Token::Operator(Operator::Mul)
-        || token == Token::Operator(Operator::Div)
-        || token == Token::Operator(Operator::Modulus)
-}
-
-pub fn is_exponent(token: Token) -> bool {
-    token == Token::Operator(Operator::Exponent)
-}
-
 pub fn extract_op(token: Token) -> Result<Operator, String> {
     if let Token::Operator(op) = token {
         Ok(op)
