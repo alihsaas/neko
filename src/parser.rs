@@ -32,14 +32,14 @@ impl<'a> Parser<'a> {
             Token::Identifier(iden) => Ok(Node::Identifier(iden)),
             Token::String(string) => Ok(Node::String(string)),
             Token::Boolean(boolean) => Ok(Node::Boolean(boolean)),
-            Token::Operator(Operator::Plus) | Token::Operator(Operator::Minus) => {
+            Token::Operator(Operator::Plus) | Token::Operator(Operator::Minus) | Token::Operator(Operator::Not) => {
                 Ok(Node::UnaryOperator(Box::new(UnaryOperator {
                     operator: extract_op(token)?,
                     expression: self.term()?,
                 })))
             }
             Token::LParen => {
-                let result = self.addition_expr();
+                let result = self.expression();
                 let current_token = self.lexer.next();
 
                 match current_token {
@@ -140,8 +140,80 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn comparison(&mut self) -> PResult {
+        let mut node = self.addition_expr()?;
+
+        loop {
+            match self.lexer.peek() {
+                Token::Operator(Operator::GreatThan) => {
+                    self.lexer.next();
+                    node = Node::BinOperator(Box::new(BinOperator {
+                        left: node,
+                        operator: Operator::GreatThan,
+                        right: self.addition_expr()?,
+                    }))
+                }
+                Token::Operator(Operator::GreatThanOrEqual) => {
+                    self.lexer.next();
+                    node = Node::BinOperator(Box::new(BinOperator {
+                        left: node,
+                        operator: Operator::GreatThanOrEqual,
+                        right: self.addition_expr()?,
+                    }))
+                }
+                Token::Operator(Operator::LessThan) => {
+                    self.lexer.next();
+                    node = Node::BinOperator(Box::new(BinOperator {
+                        left: node,
+                        operator: Operator::LessThan,
+                        right: self.addition_expr()?,
+                    }))
+                }
+                Token::Operator(Operator::LessThanOrEqual) => {
+                    self.lexer.next();
+                    node = Node::BinOperator(Box::new(BinOperator {
+                        left: node,
+                        operator: Operator::LessThanOrEqual,
+                        right: self.addition_expr()?,
+                    }))
+                }
+                _ => break,
+            }
+        }
+
+        Ok(node)
+    }
+
+    fn equality(&mut self) -> PResult {
+        let mut node = self.comparison()?;
+
+        loop {
+            match self.lexer.peek() {
+                Token::Operator(Operator::DoubleEqual) => {
+                    self.lexer.next();
+                    node = Node::BinOperator(Box::new(BinOperator {
+                        left: node,
+                        operator: Operator::DoubleEqual,
+                        right: self.addition_expr()?,
+                    }))
+                }
+                Token::Operator(Operator::NotEqual) => {
+                    self.lexer.next();
+                    node = Node::BinOperator(Box::new(BinOperator {
+                        left: node,
+                        operator: Operator::NotEqual,
+                        right: self.addition_expr()?,
+                    }))
+                }
+                _ => break,
+            }
+        }
+
+        Ok(node)
+    }
+
     pub fn expression(&mut self) -> PResult {
-        let expression = self.addition_expr()?;
+        let expression = self.equality()?;
 
         match self.lexer.peek() {
             Token::Operator(Operator::Equal)

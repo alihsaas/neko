@@ -37,6 +37,7 @@ impl<'a> Lexer<'a> {
                         "let" => self.tokens.push_back(Token::Keyword(Keyword::Let)),
                         "true" => self.tokens.push_back(Token::Boolean(true)),
                         "false" => self.tokens.push_back(Token::Boolean(false)),
+                        "not" => self.tokens.push_back(Token::Operator(Operator::Not)),
                         _ => self.tokens.push_back(Token::Identifier(word)),
                     }
                 }
@@ -101,7 +102,42 @@ impl<'a> Lexer<'a> {
                     let string = self.parse_string(&c.to_string());
                     self.tokens.push_back(Token::String(string));
                 }
-                '=' => self.tokens.push_back(Token::Operator(Operator::Equal)),
+                '>' => {
+                    let token = self.match_char(
+                        peek,
+                        '=',
+                        Token::Operator(Operator::GreatThanOrEqual),
+                        Token::Operator(Operator::GreatThan)
+                    );
+                    self.tokens.push_back(token)
+                }
+                '<' => {
+                    let token = self.match_char(
+                        peek,
+                        '=',
+                        Token::Operator(Operator::LessThanOrEqual),
+                        Token::Operator(Operator::LessThan)
+                    );
+                    self.tokens.push_back(token)
+                }
+                '=' => {
+                    let token = self.match_char(
+                        peek,
+                        '=',
+                        Token::Operator(Operator::DoubleEqual),
+                        Token::Operator(Operator::Equal)
+                    );
+                    self.tokens.push_back(token)
+                }
+                '!' => {
+                    let token = self.match_char(
+                        peek,
+                        '=',
+                        Token::Operator(Operator::NotEqual),
+                        Token::Unknown
+                    );
+                    self.tokens.push_back(token)
+                }
                 '(' => self.tokens.push_back(Token::LParen),
                 ')' => self.tokens.push_back(Token::RParen),
                 ';' => self.tokens.push_back(Token::Semicolon),

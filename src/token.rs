@@ -32,6 +32,16 @@ pub enum Operator {
     DivEqual,
     ModulusEqual,
     ExponentEqual,
+
+    LessThan,
+    LessThanOrEqual,
+    GreatThan,
+    GreatThanOrEqual,
+
+    DoubleEqual,
+    NotEqual,
+
+    Not,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

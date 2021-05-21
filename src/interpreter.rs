@@ -7,7 +7,7 @@ pub struct Interpreter {
     semantic_analyzer: SemanticAnalyzer,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
@@ -26,6 +26,15 @@ fn convert_f64_usize(x: f64) -> Result<usize, String> {
     }
 }
 
+fn to_bool(val: &Value) -> bool {
+    match val {
+        Value::Number(num) => !num.eq(&0.0),
+        Value::String(string) => !string.is_empty(),
+        Value::Boolean(boolean) => *boolean,
+        Value::NoValue => false,
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Self {
         Self {
@@ -34,17 +43,28 @@ impl Interpreter {
         }
     }
 
-    fn number_operation(&mut self, node: &BinOperator, callback: fn(f64, f64) -> f64) -> IResult {
-        match (self.visit(&node.left)?, self.visit(&node.right)?) {
+    fn number_operation(&mut self, operator: Operator, left: Value, right: Value, callback: fn(f64, f64) -> f64) -> IResult {
+        match (left, right) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(callback(a, b))),
             (a, b) => Err(format!(
                 "Expected Number for binary {:?}, got {:?}, {:?}",
-                node.operator, a, b
+                operator, a, b
+            )),
+        }
+    }
+
+    fn bool_operation(&mut self, operator: Operator, left: Value, right: Value, callback: fn(f64, f64) -> bool) -> IResult {
+        match (left, right) {
+            (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(callback(a, b))),
+            (a, b) => Err(format!(
+                "Expected Number for binary {:?}, got {:?}, {:?}",
+                operator, a, b
             )),
         }
     }
 
     fn visit_bin_operator(&mut self, node: &BinOperator) -> IResult {
+        let (left, right) = (self.visit(&node.left)?, self.visit(&node.right)?);
         match node.operator {
             Operator::Plus => match (self.visit(&node.left)?, self.visit(&node.right)?) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
@@ -54,8 +74,8 @@ impl Interpreter {
                     a, b
                 )),
             },
-            Operator::Minus => self.number_operation(node, |a, b| a - b),
-            Operator::Mul => match (self.visit(&node.left)?, self.visit(&node.right)?) {
+            Operator::Minus => self.number_operation(node.operator, left, right, |a, b| a - b),
+            Operator::Mul => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
                 (Value::String(a), Value::Number(b)) | (Value::Number(b), Value::String(a)) => Ok(
                     Value::String(a.repeat(convert_f64_usize(b).or(Err(String::from(
@@ -67,9 +87,15 @@ impl Interpreter {
                     a, b
                 )),
             },
-            Operator::Div => self.number_operation(node, |a, b| a / b),
-            Operator::Modulus => self.number_operation(node, |a, b| a % b),
-            Operator::Exponent => self.number_operation(node, |a, b| a.powf(b)),
+            Operator::Div => self.number_operation(node.operator, left, right, |a, b| a / b),
+            Operator::Modulus => self.number_operation(node.operator, left, right, |a, b| a % b),
+            Operator::Exponent => self.number_operation(node.operator, left, right, |a, b| a.powf(b)),
+            Operator::Equal => Ok(Value::Boolean(left == right)),
+            Operator::NotEqual => Ok(Value::Boolean(left != right)),
+            Operator::GreatThan => self.bool_operation(node.operator, left, right, |a, b| a > b),
+            Operator::GreatThanOrEqual => self.bool_operation(node.operator, left, right, |a, b| a >= b),
+            Operator::LessThan => self.bool_operation(node.operator, left, right, |a, b| a < b),
+            Operator::LessThanOrEqual => self.bool_operation(node.operator, left, right, |a, b| a <= b),
             _ => Err(format!("Expected Operator, got {}.", node)),
         }
     }
@@ -84,6 +110,18 @@ impl Interpreter {
                     node.operator, other
                 )),
             },
+            Operator::Not => {
+                let value = self.visit(&node.expression)?;
+                match value {
+                    Value::Boolean(boolean) => Ok(Value::Boolean(!boolean)),
+                    Value::String(_) => Ok(Value::Boolean(!to_bool(&value))),
+                    Value::Number(_) => Ok(Value::Boolean(!to_bool(&value))),
+                    other => Err(format!(
+                        "Expected Number for Unary {:?}, got {:?}",
+                        node.operator, other
+                    )),
+                }
+            }
             _ => Err(format!(
                 "Expected Unary Operator '+' or '-', got {}",
                 node.operator
