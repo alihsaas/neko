@@ -342,3 +342,22 @@ fn should_lex_strings() {
         ]
     );
 }
+
+#[test]
+fn should_lex_bool_operations() {
+    let mut lexer = Lexer::new("== != >= <= < > not");
+    lexer.lex();
+    assert_eq!(
+        lexer.tokens,
+        [
+            Token::Operator(Operator::DoubleEqual),
+            Token::Operator(Operator::NotEqual),
+            Token::Operator(Operator::GreatThanOrEqual),
+            Token::Operator(Operator::LessThanOrEqual),
+            Token::Operator(Operator::LessThan),
+            Token::Operator(Operator::GreatThan),
+            Token::Operator(Operator::Not),
+            Token::EndOfFile,
+        ]
+    );
+}

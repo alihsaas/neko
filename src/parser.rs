@@ -417,26 +417,56 @@ fn should_parse_compound_assignments() {
             Node::Expression(Box::new(Node::AssignmentExpr(Box::new(AssignmentExpr {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
-                    left: Node::Identifier(String::from("foo"),),
+                    left: Node::Identifier(String::from("foo")),
                     operator: Operator::Plus,
-                    right: Node::Number(20.0,),
+                    right: Node::Number(20.0),
                 })),
             })))),
             Node::Expression(Box::new(Node::AssignmentExpr(Box::new(AssignmentExpr {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
-                    left: Node::Identifier(String::from("foo"),),
+                    left: Node::Identifier(String::from("foo")),
                     operator: Operator::Div,
-                    right: Node::Number(2.0,),
+                    right: Node::Number(2.0),
                 })),
             })))),
             Node::Expression(Box::new(Node::AssignmentExpr(Box::new(AssignmentExpr {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
-                    left: Node::Identifier(String::from("foo"),),
+                    left: Node::Identifier(String::from("foo")),
                     operator: Operator::Exponent,
-                    right: Node::Number(2.0,),
+                    right: Node::Number(2.0),
                 })),
+            })))),
+        ])
+    );
+}
+
+#[test]
+fn should_parse_comparision() {
+    let mut parser = Parser::new("let foo = 10; foo <= 20; foo >= 2; foo == 10;");
+    let result = parser.parse().unwrap();
+    assert_eq!(
+        result,
+        Node::Compound(vec![
+            Node::VariabeDecleration(Box::new(VariabeDecleration {
+                identifier: String::from("foo"),
+                value: Some(Node::Number(10.0)),
+            })),
+            Node::Expression(Box::new(Node::BinOperator(Box::new(BinOperator {
+                left: Node::Identifier(String::from("foo")),
+                operator: Operator::LessThanOrEqual,
+                right: Node::Number(20.0),
+            })))),
+            Node::Expression(Box::new(Node::BinOperator(Box::new(BinOperator {
+                left: Node::Identifier(String::from("foo")),
+                operator: Operator::GreatThanOrEqual,
+                right: Node::Number(2.0),
+            })))),
+            Node::Expression(Box::new(Node::BinOperator(Box::new(BinOperator {
+                left: Node::Identifier(String::from("foo")),
+                operator: Operator::DoubleEqual,
+                right: Node::Number(10.0),
             })))),
         ])
     );
