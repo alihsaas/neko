@@ -19,7 +19,7 @@ pub type IResult = Result<Value, String>;
 
 fn convert_f64_usize(x: f64) -> Result<usize, String> {
     let result = x as usize;
-    if result as f64 != x {
+    if (result as f64 - x).abs() > 0.0 {
         Err(String::from("Cannot convert"))
     } else {
         Ok(result)
@@ -90,9 +90,11 @@ impl Interpreter {
             Operator::Mul => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
                 (Value::String(a), Value::Number(b)) | (Value::Number(b), Value::String(a)) => Ok(
-                    Value::String(a.repeat(convert_f64_usize(b).or(Err(String::from(
+                    Value::String(a.repeat(convert_f64_usize(b).map_err(|_| {
+                        String::from(
                         "Can't multiply sequence by non-positive int of type float or negative int",
-                    )))?)),
+                    )
+                    })?)),
                 ),
                 (a, b) => Err(format!(
                     "Mismatched types for binary Mul, got {:?} and {:?}",
@@ -147,7 +149,7 @@ impl Interpreter {
         }
     }
 
-    fn visit_compound(&mut self, nodes: &Vec<Node>) -> IResult {
+    fn visit_compound(&mut self, nodes: &[Node]) -> IResult {
         let mut result = Value::NoValue;
 
         for node in nodes {
@@ -184,7 +186,7 @@ impl Interpreter {
             Node::Identifier(iden) => self
                 .globals
                 .get(iden)
-                .map(|val| val.clone())
+                .cloned()
                 .ok_or(format!("{} is not defined", iden)),
             Node::UnaryOperator(node) => self.visit_unary_operator(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
@@ -195,7 +197,7 @@ impl Interpreter {
     fn visit_assignment(&mut self, node: &AssignmentExpr) -> IResult {
         let value = self.visit(&node.value)?;
         self.globals.insert(node.identifier.clone(), value.clone());
-        Ok(value.clone())
+        Ok(value)
     }
 
     fn visit(&mut self, node: &Node) -> IResult {

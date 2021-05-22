@@ -1,7 +1,8 @@
 [package]
 name = "neko"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["alihsaas <alihsaas2@gmail.com>"]
+build = "build.rs"
 edition = "2018"
 
 [dependencies]
@@ -9,3 +10,7 @@ structopt = "0.3.21"
 rustyline = "8.2.0"
 rustyline-derive = "0.4.0"
 ansi_term = "0.12.1"
+built = { version = "0.5.0", features = ["git2", "chrono"] }
+
+[build-dependencies]
+built = "0.5.0"

@@ -316,7 +316,7 @@ impl<'a> Parser<'a> {
                             value: None,
                         })))
                     }
-                    _ => Err(format!("Invalid syntax")),
+                    _ => Err(String::from("Invalid syntax")),
                 }
             }
             _ => Err(format!("Expected identifier, got {}", self.lexer.peek())),

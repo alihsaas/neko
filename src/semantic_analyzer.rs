@@ -15,7 +15,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn visit_compound(&mut self, nodes: &Vec<Node>) -> SResult {
+    fn visit_compound(&mut self, nodes: &[Node]) -> SResult {
         for node in nodes {
             self.visit(&node)?
         }
@@ -24,7 +24,7 @@ impl SemanticAnalyzer {
     }
 
     fn visit_assignment(&mut self, node: &AssignmentExpr) -> SResult {
-        if let Some(_) = self.symbol_table.get(&node.identifier) {
+        if self.symbol_table.get(&node.identifier).is_some() {
             self.visit(&node.value)?;
             Ok(())
         } else {
@@ -36,7 +36,7 @@ impl SemanticAnalyzer {
     }
 
     fn visit_variable_decleration(&mut self, node: &VariabeDecleration) -> SResult {
-        if let Some(_) = self.symbol_table.get(&node.identifier) {
+        if self.symbol_table.get(&node.identifier).is_some() {
             Err(format!("Duplicate variable {}", &node.identifier))
         } else {
             self.symbol_table.insert(
