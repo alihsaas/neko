@@ -27,12 +27,28 @@ pub struct AssignmentExpr {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct FunctionDecleration {
+    pub name: String,
+    pub params: Vec<String>,
+    pub block: Node,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FunctionCall {
+    pub function: Node,
+    pub arguments: Vec<Node>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Node {
     Number(f64),
     String(String),
     Boolean(bool),
     Identifier(String),
     Compound(Vec<Node>),
+    Block(Vec<Node>),
+    FunctionDecleration(Box<FunctionDecleration>),
+    FunctionCall(Box<FunctionCall>),
     VariabeDecleration(Box<VariabeDecleration>),
     AssignmentExpr(Box<AssignmentExpr>),
     BinOperator(Box<BinOperator>),

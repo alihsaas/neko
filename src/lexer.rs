@@ -38,6 +38,7 @@ impl<'a> Lexer<'a> {
                         "true" => self.tokens.push_back(Token::Boolean(true)),
                         "false" => self.tokens.push_back(Token::Boolean(false)),
                         "not" => self.tokens.push_back(Token::Operator(Operator::Not)),
+                        "function" => self.tokens.push_back(Token::Keyword(Keyword::Function)),
                         _ => self.tokens.push_back(Token::Identifier(word)),
                     }
                 }
@@ -140,6 +141,9 @@ impl<'a> Lexer<'a> {
                 }
                 '(' => self.tokens.push_back(Token::LParen),
                 ')' => self.tokens.push_back(Token::RParen),
+                '{' => self.tokens.push_back(Token::LBrace),
+                '}' => self.tokens.push_back(Token::RBrace),
+                ',' => self.tokens.push_back(Token::Comma),
                 ';' => self.tokens.push_back(Token::Semicolon),
                 _ => (),
             }

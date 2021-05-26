@@ -1,18 +1,10 @@
-use crate::{ast::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
-use std::collections::HashMap;
+use crate::{ast::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*, enviroment::*};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug)]
 pub struct Interpreter {
-    globals: HashMap<String, Value>,
+    env: Env,
     semantic_analyzer: SemanticAnalyzer,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    Number(f64),
-    Boolean(bool),
-    String(String),
-    NoValue,
 }
 
 pub type IResult = Result<Value, String>;
@@ -31,6 +23,7 @@ fn to_bool(val: &Value) -> bool {
         Value::Number(num) => num.ne(&0.0),
         Value::String(string) => !string.is_empty(),
         Value::Boolean(boolean) => *boolean,
+        Value::Function(_) => true,
         Value::NoValue => false,
     }
 }
@@ -38,7 +31,7 @@ fn to_bool(val: &Value) -> bool {
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            globals: HashMap::new(),
+            env: Rc::new(RefCell::new(Enviroment::new(None))),
             semantic_analyzer: SemanticAnalyzer::new(),
         }
     }
@@ -76,9 +69,12 @@ impl Interpreter {
     }
 
     fn visit_bin_operator(&mut self, node: &BinOperator) -> IResult {
-        let (left, right) = (self.visit(&node.left)?, self.visit(&node.right)?);
+        let (left, right) = (
+            self.visit_expression(&node.left)?,
+            self.visit_expression(&node.right)?,
+        );
         match node.operator {
-            Operator::Plus => match (self.visit(&node.left)?, self.visit(&node.right)?) {
+            Operator::Plus => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
                 (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
                 (a, b) => Err(format!(
@@ -122,8 +118,8 @@ impl Interpreter {
 
     fn visit_unary_operator(&mut self, node: &UnaryOperator) -> IResult {
         match node.operator {
-            Operator::Plus => self.visit(&node.expression),
-            Operator::Minus => match self.visit(&node.expression)? {
+            Operator::Plus => self.visit_expression(&node.expression),
+            Operator::Minus => match self.visit_expression(&node.expression)? {
                 Value::Number(num) => Ok(Value::Number(-num)),
                 other => Err(format!(
                     "Expected Number for Unary {:?}, got {:?}",
@@ -131,7 +127,7 @@ impl Interpreter {
                 )),
             },
             Operator::Not => {
-                let value = self.visit(&node.expression)?;
+                let value = self.visit_expression(&node.expression)?;
                 match value {
                     Value::Boolean(boolean) => Ok(Value::Boolean(!boolean)),
                     Value::String(_) => Ok(Value::Boolean(!to_bool(&value))),
@@ -167,14 +163,74 @@ impl Interpreter {
             Some(value_node) => match self.visit(value_node) {
                 Ok(val) => val,
                 Err(err) => {
-                    self.semantic_analyzer.symbol_table.remove(&node.identifier);
+                    self.semantic_analyzer
+                        .scope
+                        .borrow_mut()
+                        .remove(&node.identifier);
                     return Err(err);
                 }
             },
             None => Value::NoValue,
         };
-        self.globals.insert(node.identifier.clone(), value);
+        self.env.borrow_mut().define(&node.identifier, value);
         Ok(Value::NoValue)
+    }
+
+    fn visit_function_decleration(&mut self, node: &FunctionDecleration) -> IResult {
+        let function = Value::Function(node.clone());
+        self.env.borrow_mut().define(&node.name, function.clone());
+        Ok(function)
+    }
+
+    fn visit_block(&mut self, nodes: &[Node]) -> IResult {
+        let mut result = Value::NoValue;
+
+        for node in nodes {
+            match self.visit(&node)? {
+                Value::NoValue => (),
+                val => result = val,
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn visit_function_call(&mut self, node: &FunctionCall) -> IResult {
+        match &node.function {
+            Node::Identifier(identifier) => {
+                let current_env = self.env.borrow().look_up(identifier, false);
+                match current_env {
+                    Some(value) => match value {
+                        Value::Function(function) => {
+                            self.env = Rc::new(RefCell::new(Enviroment::new(Some(Rc::clone(&self.env)))));
+
+                            for (index, param) in function.params.iter().enumerate() {
+                                let value = match node.arguments.get(index) {
+                                    Some(node) => self.visit(node)?,
+                                    None => Value::NoValue
+                                };
+                                self.env.borrow_mut().define(&param, value)
+                            }
+
+                            let result = self.visit(&function.block)?;
+
+                            self.env = Rc::clone(
+                                Rc::clone(&self.env)
+                                    .borrow()
+                                    .enclosing_enviroment
+                                    .as_ref()
+                                    .unwrap(),
+                            );
+
+                            Ok(result)
+                        },
+                        value => Err(format!("{:?} is not a function", value))
+                    },
+                    None => Err(format!("{} is not defined", identifier))
+                }
+            },
+            node => Err(format!("{} is not a function", node)),
+        }
     }
 
     fn visit_expression(&mut self, node: &Node) -> IResult {
@@ -184,19 +240,20 @@ impl Interpreter {
             Node::Boolean(boolean) => Ok(Value::Boolean(*boolean)),
             Node::String(string) => Ok(Value::String(string.clone())),
             Node::Identifier(iden) => self
-                .globals
-                .get(iden)
-                .cloned()
+                .env
+                .borrow()
+                .look_up(iden, false)
                 .ok_or(format!("{} is not defined", iden)),
             Node::UnaryOperator(node) => self.visit_unary_operator(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
+            Node::FunctionCall(node) => self.visit_function_call(node),
             _ => Err(String::from("Invalid Syntax")),
         }
     }
 
     fn visit_assignment(&mut self, node: &AssignmentExpr) -> IResult {
-        let value = self.visit(&node.value)?;
-        self.globals.insert(node.identifier.clone(), value.clone());
+        let value = self.visit_expression(&node.value)?;
+        self.env.borrow_mut().assign(&node.identifier, value.clone())?;
         Ok(value)
     }
 
@@ -204,6 +261,8 @@ impl Interpreter {
         match node {
             Node::Compound(nodes) => self.visit_compound(nodes),
             Node::VariabeDecleration(node) => self.visit_variable_decleration(node),
+            Node::FunctionDecleration(function) => self.visit_function_decleration(function),
+            Node::Block(nodes) => self.visit_block(nodes),
             Node::Expression(node) => self.visit_expression(node),
             node => self.visit_expression(node),
         }
@@ -212,7 +271,7 @@ impl Interpreter {
     pub fn interpret(&mut self, text: &str) -> IResult {
         let mut parser = Parser::new(text);
         let ast = parser.parse()?;
-        self.semantic_analyzer.visit(&ast)?;
+        self.semantic_analyzer.analyze(&ast)?;
         self.visit(&ast)
     }
 }

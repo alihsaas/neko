@@ -1,5 +1,3 @@
-use std::vec;
-
 use crate::{ast::*, lexer::Lexer, token::*};
 
 type PResult = Result<Node, String>;
@@ -24,7 +22,7 @@ impl<'a> Parser<'a> {
         term : (PLUS | MINUS) term | NUMBER | LPAREN expr RPAREN
     */
 
-    fn term(&mut self) -> PResult {
+    fn value(&mut self) -> PResult {
         let token = self.lexer.next();
 
         match token {
@@ -32,12 +30,6 @@ impl<'a> Parser<'a> {
             Token::Identifier(iden) => Ok(Node::Identifier(iden)),
             Token::String(string) => Ok(Node::String(string)),
             Token::Boolean(boolean) => Ok(Node::Boolean(boolean)),
-            Token::Operator(Operator::Plus)
-            | Token::Operator(Operator::Minus)
-            | Token::Operator(Operator::Not) => Ok(Node::UnaryOperator(Box::new(UnaryOperator {
-                operator: extract_op(token)?,
-                expression: self.term()?,
-            }))),
             Token::LParen => {
                 let result = self.expression();
                 let current_token = self.lexer.next();
@@ -51,8 +43,43 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn call_expression(&mut self) -> PResult {
+        let mut node = self.value()?;
+
+        loop {
+            if let Token::LParen = self.lexer.peek() {
+                let arguments = self.argument_list()?;
+                node = Node::FunctionCall(Box::new(FunctionCall {
+                    function: node,
+                    arguments,
+                }))
+            } else {
+                break
+            }
+        }
+
+        Ok(node)
+    }
+
+    fn unary_expression(&mut self) -> PResult {
+        let token = self.lexer.peek();
+        let node = match token {
+            Token::Operator(Operator::Plus)
+            | Token::Operator(Operator::Minus)
+            | Token::Operator(Operator::Not) => {
+                self.lexer.next();
+                 Node::UnaryOperator(Box::new(UnaryOperator {
+                    operator: extract_op(token)?,
+                    expression: self.unary_expression()?,
+                }))
+            }
+            _ => self.call_expression()?,
+        };
+        Ok(node)
+    }
+
     fn exponent_expr(&mut self) -> PResult {
-        let mut node = self.term()?;
+        let mut node = self.unary_expression()?;
 
         loop {
             let token = self.lexer.peek();
@@ -62,7 +89,7 @@ impl<'a> Parser<'a> {
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
                         operator: extract_op(token)?,
-                        right: self.term()?,
+                        right: self.unary_expression()?,
                     }))
                 }
                 _ => break,
@@ -323,13 +350,83 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn statment(&mut self) -> PResult {
+    fn decerlation(&mut self) -> PResult {
         let token = self.lexer.peek();
 
         match token {
             Token::Keyword(Keyword::Let) => self.variable_decleration(),
+            Token::Keyword(Keyword::Function) => self.function_decleration(),
             _ => self.expression_statment(),
         }
+    }
+
+    fn function_decleration(&mut self) -> PResult {
+        self.eat(Token::Keyword(Keyword::Function))?;
+
+        match self.lexer.peek() {
+            Token::Identifier(identifier) => {
+                self.lexer.next();
+                let param_list = self.parameter_list()?;
+                let block_node = self.block()?;
+                Ok(Node::FunctionDecleration(Box::new(FunctionDecleration {
+                    name: identifier,
+                    params: param_list,
+                    block: block_node,
+                })))
+            }
+            token => Err(format!("Expected identifier, got {}", token)),
+        }
+    }
+
+    fn block(&mut self) -> PResult {
+        self.eat(Token::LBrace)?;
+        let mut declarations = vec![];
+
+        loop {
+            match self.lexer.peek() {
+                Token::RBrace => break,
+                _ => declarations.push(self.decerlation()?),
+            }
+        }
+
+        self.eat(Token::RBrace)?;
+        Ok(Node::Block(declarations))
+    }
+
+    fn argument_list(&mut self) -> Result<Vec<Node>, String> {
+        let mut args = vec![];
+
+        self.eat(Token::LParen)?;
+
+        loop {
+            match self.lexer.peek() {
+                Token::Comma => {self.lexer.next();},
+                Token::RParen => break,
+                _ => {args.push(self.expression()?); },
+            };
+        }
+
+        self.eat(Token::RParen)?;
+        Ok(args)        
+    }
+
+    fn parameter_list(&mut self) -> Result<Vec<String>, String> {
+        let mut params = vec![];
+
+        self.eat(Token::LParen)?;
+        while let Token::Identifier(identifier) = self.lexer.peek() {
+            self.lexer.next();
+            match self.lexer.peek() {
+                Token::RParen => (),
+                Token::Comma => {
+                    self.lexer.next();
+                }
+                token => return Err(format!("Expected ')' or ',', got {}", token)),
+            };
+            params.push(identifier)
+        }
+        self.eat(Token::RParen)?;
+        Ok(params)
     }
 
     fn program(&mut self) -> PResult {
@@ -338,7 +435,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.lexer.peek() {
                 Token::EndOfFile => break,
-                _ => declarations.push(self.statment()?),
+                _ => declarations.push(self.decerlation()?),
             }
         }
 
@@ -469,5 +566,30 @@ fn should_parse_comparision() {
                 right: Node::Number(10.0),
             })))),
         ])
+    );
+}
+
+#[test]
+fn should_parse_function_statement() {
+    let mut parser = Parser::new("function foo(bar, baz) { let bee = bar + baz; }");
+    let result = parser.parse().unwrap();
+    assert_eq!(
+        result,
+        Node::Compound(vec![Node::FunctionDecleration(Box::new(
+            FunctionDecleration {
+                name: String::from("foo"),
+                params: vec![String::from("bar"), String::from("baz"),],
+                block: Node::Block(vec![Node::VariabeDecleration(Box::new(
+                    VariabeDecleration {
+                        identifier: String::from("bee"),
+                        value: Some(Node::BinOperator(Box::new(BinOperator {
+                            left: Node::Identifier(String::from("bar")),
+                            operator: Operator::Plus,
+                            right: Node::Identifier(String::from("baz"))
+                        })))
+                    }
+                ))])
+            }
+        ))])
     );
 }

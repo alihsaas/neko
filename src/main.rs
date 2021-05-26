@@ -1,5 +1,6 @@
 use ansi_term::Colour;
-use interpreter::{IResult, Interpreter, Value};
+use enviroment::Value;
+use interpreter::{IResult, Interpreter};
 use repl::Repl;
 use rustyline::error::ReadlineError;
 use std::{fs, io::Result as IOResult, path::PathBuf};
@@ -7,12 +8,14 @@ use structopt::StructOpt;
 
 mod ast;
 mod editor_helper;
+mod enviroment;
 mod interpreter;
 mod lexer;
 mod parser;
 mod repl;
 mod semantic_analyzer;
 mod symbol;
+mod symbol_table;
 mod token;
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -31,6 +34,7 @@ fn log_result(result: IResult) {
             Value::Number(num) => println!("{}", Colour::Yellow.paint(num.to_string())),
             Value::Boolean(boolean) => println!("{}", Colour::Yellow.paint(boolean.to_string())),
             Value::String(string) => println!("{}", Colour::Green.paint(format!("{:?}", string))),
+            Value::Function(function) => println!("{}", Colour::Green.paint(format!("[Function: {}]", function.name))),
             Value::NoValue => (),
         },
         Err(err) => eprintln!("{}", err),
@@ -47,24 +51,25 @@ fn main() -> IOResult<()> {
     #[cfg(target_os = "windows")]
     let _ = ansi_term::enable_ansi_support();
 
-    println!(
-        "Neko v{} | [{}, {}] for {}.\nType '.help' for more information.",
-        built_info::PKG_VERSION,
-        built_info::GIT_VERSION.unwrap_or("unknown"),
-        built_info::BUILT_TIME_UTC.split(' ').collect::<Vec<&str>>()[..5]
-            .join(", ")
-            .replacen(",", "", 4),
-        built_info::TARGET,
-    );
-
     let args = CLIArgs::from_args();
 
-    let mut interpreter = Interpreter::new();
     if let Some(file) = args.file {
+        let mut interpreter = Interpreter::new();
         let result = interpreter.interpret(&fs::read_to_string(file)?);
         log_result(result);
         Ok(())
     } else {
+        println!(
+            "Neko v{} | [{}, {}] for {}.\nType '.help' for more information.",
+            built_info::PKG_VERSION,
+            built_info::GIT_VERSION.unwrap_or("unknown"),
+            built_info::BUILT_TIME_UTC.split(' ').collect::<Vec<&str>>()[..5]
+                .join(", ")
+                .replacen(",", "", 4),
+            built_info::TARGET,
+        );
+
+        let mut interpreter = Interpreter::new();
         let mut repl = Repl::new();
         let _ = repl.editor.load_history("history.txt");
         loop {

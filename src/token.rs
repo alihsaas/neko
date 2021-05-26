@@ -11,6 +11,9 @@ pub enum Token {
     Keyword(Keyword),
     LParen,
     RParen,
+    LBrace,
+    RBrace,
+    Comma,
     EndOfFile,
     Semicolon,
     Unknown,
@@ -47,6 +50,7 @@ pub enum Operator {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Keyword {
     Let,
+    Function,
 }
 
 pub fn extract_op(token: Token) -> Result<Operator, String> {
