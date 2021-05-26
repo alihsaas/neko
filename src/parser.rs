@@ -39,23 +39,18 @@ impl<'a> Parser<'a> {
                     _ => Err(format!("Expected closing ')', got {}", current_token)),
                 }
             }
-            _ => Err(format!("Expected number got {:?}", token)),
+            _ => Err(String::from("Invalid Syntax")),
         }
     }
 
     fn call_expression(&mut self) -> PResult {
         let mut node = self.value()?;
-
-        loop {
-            if let Token::LParen = self.lexer.peek() {
-                let arguments = self.argument_list()?;
-                node = Node::FunctionCall(Box::new(FunctionCall {
-                    function: node,
-                    arguments,
-                }))
-            } else {
-                break
-            }
+        while let Token::LParen = self.lexer.peek() {
+            let arguments = self.argument_list()?;
+            node = Node::FunctionCall(Box::new(FunctionCall {
+                function: node,
+                arguments,
+            }))
         }
 
         Ok(node)
@@ -68,7 +63,7 @@ impl<'a> Parser<'a> {
             | Token::Operator(Operator::Minus)
             | Token::Operator(Operator::Not) => {
                 self.lexer.next();
-                 Node::UnaryOperator(Box::new(UnaryOperator {
+                Node::UnaryOperator(Box::new(UnaryOperator {
                     operator: extract_op(token)?,
                     expression: self.unary_expression()?,
                 }))
@@ -400,14 +395,18 @@ impl<'a> Parser<'a> {
 
         loop {
             match self.lexer.peek() {
-                Token::Comma => {self.lexer.next();},
+                Token::Comma => {
+                    self.lexer.next();
+                }
                 Token::RParen => break,
-                _ => {args.push(self.expression()?); },
+                _ => {
+                    args.push(self.expression()?);
+                }
             };
         }
 
         self.eat(Token::RParen)?;
-        Ok(args)        
+        Ok(args)
     }
 
     fn parameter_list(&mut self) -> Result<Vec<String>, String> {

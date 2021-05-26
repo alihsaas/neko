@@ -33,7 +33,12 @@ impl SemanticAnalyzer {
     }
 
     fn visit_assignment(&mut self, node: &AssignmentExpr) -> SResult {
-        if self.scope.borrow().look_up(&node.identifier, false).is_some() {
+        if self
+            .scope
+            .borrow()
+            .look_up(&node.identifier, false)
+            .is_some()
+        {
             self.visit(&node.value)?;
             Ok(())
         } else {
@@ -45,7 +50,12 @@ impl SemanticAnalyzer {
     }
 
     fn visit_variable_decleration(&mut self, node: &VariabeDecleration) -> SResult {
-        if self.scope.borrow().look_up(&node.identifier, true).is_some() {
+        if self
+            .scope
+            .borrow()
+            .look_up(&node.identifier, true)
+            .is_some()
+        {
             Err(format!("Duplicate variable {}", &node.identifier))
         } else {
             self.scope.borrow_mut().insert(
@@ -75,7 +85,11 @@ impl SemanticAnalyzer {
             if let Some(symbol) = self.scope.borrow().look_up(identifier, false) {
                 if let Symbol::FunctionSymbol(symbol) = symbol {
                     if symbol.param.len() != node.arguments.len() {
-                        Err(format!("Expected {} number of arguments got {}", symbol.param.len(), node.arguments.len()))
+                        Err(format!(
+                            "Expected {} number of arguments got {}",
+                            symbol.param.len(),
+                            node.arguments.len()
+                        ))
                     } else {
                         Ok(())
                     }
@@ -112,10 +126,13 @@ impl SemanticAnalyzer {
     fn visit_function_decleration(&mut self, node: &FunctionDecleration) -> SResult {
         let function_name = &node.name;
         if self.scope.borrow().look_up(function_name, true).is_none() {
-            self.scope.borrow_mut().insert(&function_name, Symbol::FunctionSymbol(FunctionSymbol {
-                name: function_name.clone(),
-                param: node.params.clone(),
-            }));
+            self.scope.borrow_mut().insert(
+                &function_name,
+                Symbol::FunctionSymbol(FunctionSymbol {
+                    name: function_name.clone(),
+                    param: node.params.clone(),
+                }),
+            );
             let level = self.scope.borrow().scope_level + 1;
             self.scope = Rc::new(RefCell::new(SymbolTable::new(
                 &function_name,
@@ -161,8 +178,7 @@ impl SemanticAnalyzer {
     }
 
     pub fn analyze(&mut self, node: &Node) -> SResult {
-        let result = self.visit(node);
-        result
+        self.visit(node)
     }
 }
 

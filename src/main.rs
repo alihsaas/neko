@@ -34,7 +34,10 @@ fn log_result(result: IResult) {
             Value::Number(num) => println!("{}", Colour::Yellow.paint(num.to_string())),
             Value::Boolean(boolean) => println!("{}", Colour::Yellow.paint(boolean.to_string())),
             Value::String(string) => println!("{}", Colour::Green.paint(format!("{:?}", string))),
-            Value::Function(function) => println!("{}", Colour::Green.paint(format!("[Function: {}]", function.name))),
+            Value::Function(function) => println!(
+                "{}",
+                Colour::Green.paint(format!("[Function: {}]", function.name))
+            ),
             Value::NoValue => (),
         },
         Err(err) => eprintln!("{}", err),

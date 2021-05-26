@@ -1,3 +1,6 @@
+## [0.4.0]
+- Added Functions
+
 ## [0.3.1]
 - Added REPL start message
 - Added loading Neko files in REPL (.load)
