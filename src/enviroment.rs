@@ -10,7 +10,6 @@ pub enum Value {
     NoValue,
 }
 
-
 pub type Env = Rc<RefCell<Enviroment>>;
 
 #[derive(Debug)]
@@ -20,37 +19,37 @@ pub struct Enviroment {
 }
 
 impl Enviroment {
-
     pub fn new(enclosing_enviroment: Option<Env>) -> Self {
         Self {
             values: HashMap::new(),
-            enclosing_enviroment
+            enclosing_enviroment,
         }
     }
 
     pub fn look_up(&self, name: &str, current_env_only: bool) -> Option<Value> {
         self.values
             .get(name)
-            .map(|value| value.clone())
-            .or_else(|| if current_env_only { None } else { 
-                self.enclosing_enviroment.as_ref()
-                    .and_then(|env| env.borrow().look_up(name, false))
-                    .map(|value| value.clone())
+            .cloned()
+            .or_else(|| {
+                if current_env_only {
+                    None
+                } else {
+                    self.enclosing_enviroment
+                        .as_ref()
+                        .and_then(|env| env.borrow().look_up(name, false))
+                }
             })
     }
-
 
     pub fn assign(&mut self, name: &str, value: Value) -> Result<(), String> {
         if let Some(val) = self.values.get_mut(name) {
             *val = value;
             Ok(())
-        } else {
-            if let Some(env) = &self.enclosing_enviroment {
-                env.borrow_mut().assign(name, value)
-            } else {
-                Err(format!("Attempt to assign to undefined variable {}", name))
-            }
-        }
+         } else if let Some(env) = &self.enclosing_enviroment {
+             env.borrow_mut().assign(name, value)
+         } else {
+             Err(format!("Attempt to assign to undefined variable {}", name))
+         }
     }
 
     pub fn define(&mut self, name: &str, value: Value) {

@@ -1,4 +1,4 @@
-use crate::{ast::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*, enviroment::*};
+use crate::{ast::*, enviroment::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug)]
@@ -202,12 +202,13 @@ impl Interpreter {
                 match current_env {
                     Some(value) => match value {
                         Value::Function(function) => {
-                            self.env = Rc::new(RefCell::new(Enviroment::new(Some(Rc::clone(&self.env)))));
+                            self.env =
+                                Rc::new(RefCell::new(Enviroment::new(Some(Rc::clone(&self.env)))));
 
                             for (index, param) in function.params.iter().enumerate() {
                                 let value = match node.arguments.get(index) {
                                     Some(node) => self.visit(node)?,
-                                    None => Value::NoValue
+                                    None => Value::NoValue,
                                 };
                                 self.env.borrow_mut().define(&param, value)
                             }
@@ -223,12 +224,12 @@ impl Interpreter {
                             );
 
                             Ok(result)
-                        },
-                        value => Err(format!("{:?} is not a function", value))
+                        }
+                        value => Err(format!("{:?} is not a function", value)),
                     },
-                    None => Err(format!("{} is not defined", identifier))
+                    None => Err(format!("{} is not defined", identifier)),
                 }
-            },
+            }
             node => Err(format!("{} is not a function", node)),
         }
     }
@@ -253,7 +254,9 @@ impl Interpreter {
 
     fn visit_assignment(&mut self, node: &AssignmentExpr) -> IResult {
         let value = self.visit_expression(&node.value)?;
-        self.env.borrow_mut().assign(&node.identifier, value.clone())?;
+        self.env
+            .borrow_mut()
+            .assign(&node.identifier, value.clone())?;
         Ok(value)
     }
 
