@@ -1,3 +1,7 @@
+## [0.5.0]
+- Added Lambdas
+- Added Logical 'Or' and 'And'
+
 ## [0.4.0]
 - Added Functions
 
