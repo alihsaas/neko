@@ -15,7 +15,7 @@ pub enum Value {
     Boolean(bool),
     Function(FunctionType, Env),
     String(String),
-    NoValue,
+    None,
 }
 
 #[derive(Debug, PartialEq)]

@@ -62,8 +62,7 @@ fn main() -> IOResult<()> {
 
     if let Some(file) = args.file {
         let mut interpreter = Interpreter::new();
-        let result = interpreter.interpret(&fs::read_to_string(file)?);
-        log_result(result);
+        interpreter.interpret(&fs::read_to_string(file)?);
         Ok(())
     } else {
         println!(

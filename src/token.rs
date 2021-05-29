@@ -56,6 +56,7 @@ pub enum Keyword {
     Function,
     And,
     Or,
+    None,
 }
 
 impl fmt::Display for Token {

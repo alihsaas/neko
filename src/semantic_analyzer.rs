@@ -113,6 +113,7 @@ impl SemanticAnalyzer {
             Node::Number(_) => Ok(()),
             Node::Boolean(_) => Ok(()),
             Node::String(_) => Ok(()),
+            Node::None => Ok(()),
             Node::Identifier(iden) => self
                 .scope
                 .borrow()

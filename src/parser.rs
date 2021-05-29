@@ -32,6 +32,7 @@ impl<'a> Parser<'a> {
             Token::Identifier(iden) => Ok(Node::Identifier(iden)),
             Token::String(string) => Ok(Node::String(string)),
             Token::Boolean(boolean) => Ok(Node::Boolean(boolean)),
+            Token::Keyword(Keyword::None) => Ok(Node::None),
             Token::LParen => {
                 let result = self.expression();
                 let current_token = self.lexer.next();
