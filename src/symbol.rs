@@ -5,11 +5,6 @@ pub struct VarSymbol {
 }
 
 #[derive(Debug, Clone)]
-pub struct BuildInSymbol {
-    pub name: String,
-}
-
-#[derive(Debug, Clone)]
 pub struct FunctionSymbol {
     pub name: String,
     pub param: Vec<String>,
@@ -24,6 +19,6 @@ pub enum TypeSymbol {
 #[derive(Debug, Clone)]
 pub enum Symbol {
     VarSymbol(VarSymbol),
-    BuiltInSymbol(BuildInSymbol),
+    BuiltInSymbol(String),
     FunctionSymbol(FunctionSymbol),
 }

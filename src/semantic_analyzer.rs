@@ -11,8 +11,18 @@ pub struct SemanticAnalyzer {
 
 impl SemanticAnalyzer {
     pub fn new() -> Self {
+        let scope = Rc::new(RefCell::new(SymbolTable::new("global", 1, None)));
+        let built_in = vec![Symbol::BuiltInSymbol(String::from("print"))];
+
+        for built in built_in {
+            match built {
+                Symbol::BuiltInSymbol(ref name) => scope.borrow_mut().insert(&name, built.clone()),
+                _ => unreachable!(),
+            }
+        }
+
         Self {
-            scope: Rc::new(RefCell::new(SymbolTable::new("global", 1, None))),
+            scope,
         }
     }
 

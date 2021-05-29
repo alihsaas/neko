@@ -1,5 +1,6 @@
 use crate::{ast::*, enviroment::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
 use std::{cell::RefCell, rc::Rc};
+use ansi_term::Colour;
 
 #[derive(Debug)]
 pub struct Interpreter {
@@ -24,14 +25,50 @@ fn to_bool(val: &Value) -> bool {
         Value::String(string) => !string.is_empty(),
         Value::Boolean(boolean) => *boolean,
         Value::Function(..) => true,
-        Value::NoValue => false,
+        Value::None => false,
+    }
+}
+
+pub fn loggable_value(val: &Value) -> String {
+    match val {
+        Value::Number(num) => format!("{}", Colour::Yellow.paint(num.to_string())),
+        Value::Boolean(boolean) => format!("{}", Colour::Yellow.paint(boolean.to_string())),
+        Value::String(string) => format!("{}", Colour::Green.paint(format!("{:?}", string))),
+        Value::Function(function_type, _) => format!(
+            "{}",
+            match function_type {
+                FunctionType::Function(function) =>
+                    Colour::Green.paint(format!("[Function: {}]", function.name)),
+                FunctionType::Lambda(_) => Colour::Green.paint("[Function: (lambda)]"),
+                FunctionType::BuiltIn { name, .. } => Colour::Green.paint(format!("[Built-In Function: {}]", name)),
+            }
+        ),
+        Value::None => Colour::RGB(128, 127, 113).paint("none").to_string(),
     }
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let env = Rc::new(RefCell::new(Enviroment::new(None)));
+        let built_in = vec![
+             Value::Function(FunctionType::BuiltIn {
+                name: String::from("print"),
+                function: |args| {
+                    println!("{}", args.iter().map(loggable_value).collect::<Vec<String>>().join(" "));
+                    Ok(Value::None)
+                }
+            }, Rc::clone(&env))
+        ];
+
+        for built in built_in {
+            match built {
+                 Value::Function(FunctionType::BuiltIn { ref name, .. }, _) => env.borrow_mut().define(&name, built.clone()),
+                _ => unreachable!()
+            }
+        }
+
         Self {
-            env: Rc::new(RefCell::new(Enviroment::new(None))),
+            env,
             semantic_analyzer: SemanticAnalyzer::new(),
         }
     }
@@ -170,11 +207,11 @@ impl Interpreter {
     }
 
     fn visit_compound(&mut self, nodes: &[Node]) -> IResult {
-        let mut result = Value::NoValue;
+        let mut result = Value::None;
 
         for node in nodes {
             match self.visit(&node)? {
-                Value::NoValue => (),
+                Value::None => (),
                 val => result = val,
             }
         }
@@ -194,10 +231,10 @@ impl Interpreter {
                     return Err(err);
                 }
             },
-            None => Value::NoValue,
+            None => Value::None,
         };
         self.env.borrow_mut().define(&node.identifier, value);
-        Ok(Value::NoValue)
+        Ok(Value::None)
     }
 
     fn visit_function_decleration(&mut self, node: &FunctionDecleration) -> IResult {
@@ -213,11 +250,11 @@ impl Interpreter {
     }
 
     fn visit_block(&mut self, nodes: &[Node]) -> IResult {
-        let mut result = Value::NoValue;
+        let mut result = Value::None;
 
         for node in nodes {
             match self.visit(&node)? {
-                Value::NoValue => (),
+                Value::None => (),
                 val => result = val,
             }
         }
@@ -237,7 +274,7 @@ impl Interpreter {
         for (index, param) in params.iter().enumerate() {
             let value = match node.arguments.get(index) {
                 Some(node) => self.visit(node)?,
-                None => Value::NoValue,
+                None => Value::None,
             };
             self.env.borrow_mut().define(&param, value)
         }
@@ -255,31 +292,37 @@ impl Interpreter {
         Ok(result)
     }
 
+    fn handle_function(&mut self, node: &FunctionCall, value: Value) -> IResult {
+        match value {
+            Value::Function(FunctionType::Function(function), closure) => {
+                self.function_call(node, &function.params, &function.block, closure)
+            }
+            Value::Function(FunctionType::Lambda(lambda), closure) => {
+                self.function_call(node, &lambda.params, &lambda.block, closure)
+            }
+            Value::Function(FunctionType::BuiltIn { name: _, function }, _) => {
+                let mut args = vec![];
+                for arg in &node.arguments {
+                    args.push(self.visit(&arg)?)
+                };
+                function(args)
+            }
+            value => Err(format!("{:?} is not a function", value)),
+        }
+    }
+
     fn visit_function_call(&mut self, node: &FunctionCall) -> IResult {
         match &node.function {
             Node::Identifier(identifier) => {
                 let current_env = self.env.borrow().look_up(identifier, false);
                 match current_env {
-                    Some(value) => match value {
-                        Value::Function(FunctionType::Function(function), closure) => {
-                            self.function_call(node, &function.params, &function.block, closure)
-                        }
-                        Value::Function(FunctionType::Lambda(lambda), closure) => {
-                            self.function_call(node, &lambda.params, &lambda.block, closure)
-                        }
-                        value => Err(format!("{:?} is not a function", value)),
-                    },
+                    Some(value) => self.handle_function(node, value),
                     None => Err(format!("{} is not defined", identifier)),
                 }
             }
-            Node::FunctionCall(call) => match self.visit_function_call(call)? {
-                Value::Function(FunctionType::Function(function), closure) => {
-                    self.function_call(node, &function.params, &function.block, closure)
-                }
-                Value::Function(FunctionType::Lambda(lambda), closure) => {
-                    self.function_call(node, &lambda.params, &lambda.block, closure)
-                }
-                value => Err(format!("{:?} is not a function", value)),
+            Node::FunctionCall(call) => {
+                let result = self.visit_function_call(call)?;
+                self.handle_function(node, result)
             },
             Node::Lambda(lambda) => {
                 self.function_call(node, &lambda.params, &lambda.block, Rc::clone(&self.env))
@@ -294,6 +337,7 @@ impl Interpreter {
             Node::Number(num) => Ok(Value::Number(*num)),
             Node::Boolean(boolean) => Ok(Value::Boolean(*boolean)),
             Node::String(string) => Ok(Value::String(string.clone())),
+            Node::None => Ok(Value::None),
             Node::Identifier(iden) => self
                 .env
                 .borrow()

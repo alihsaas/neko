@@ -55,6 +55,7 @@ pub enum Node {
     Compound(Vec<Node>),
     Block(Vec<Node>),
     Lambda(Box<Lambda>),
+    None,
     FunctionDecleration(Box<FunctionDecleration>),
     FunctionCall(Box<FunctionCall>),
     VariabeDecleration(Box<VariabeDecleration>),

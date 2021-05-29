@@ -7,6 +7,10 @@ pub type Env = Rc<RefCell<Enviroment>>;
 pub enum FunctionType {
     Function(FunctionDecleration),
     Lambda(Lambda),
+    BuiltIn {
+        name: String,
+        function: fn(args: Vec<Value>) -> Result<Value, String>,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

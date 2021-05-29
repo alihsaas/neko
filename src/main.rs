@@ -1,5 +1,6 @@
-use ansi_term::Colour;
-use enviroment::{FunctionType, Value};
+use crate::interpreter::loggable_value;
+
+
 use interpreter::{IResult, Interpreter};
 use repl::Repl;
 use rustyline::error::ReadlineError;
@@ -30,20 +31,7 @@ struct CLIArgs {
 
 fn log_result(result: IResult) {
     match result {
-        Ok(val) => match val {
-            Value::Number(num) => println!("{}", Colour::Yellow.paint(num.to_string())),
-            Value::Boolean(boolean) => println!("{}", Colour::Yellow.paint(boolean.to_string())),
-            Value::String(string) => println!("{}", Colour::Green.paint(format!("{:?}", string))),
-            Value::Function(function_type, _) => println!(
-                "{}",
-                match function_type {
-                    FunctionType::Function(function) =>
-                        Colour::Green.paint(format!("[Function: {}]", function.name)),
-                    FunctionType::Lambda(_) => Colour::Green.paint("[Function: (lambda)]"),
-                }
-            ),
-            Value::NoValue => (),
-        },
+        Ok(val) => println!("{}", loggable_value(&val)),
         Err(err) => eprintln!("{}", err),
     }
 }
