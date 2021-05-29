@@ -54,14 +54,8 @@ pub enum Operator {
 pub enum Keyword {
     Let,
     Function,
-}
-
-pub fn extract_op(token: Token) -> Result<Operator, String> {
-    if let Token::Operator(op) = token {
-        Ok(op)
-    } else {
-        Err(format!("Expected unary '+' or '-', got {}", token))
-    }
+    And,
+    Or,
 }
 
 impl fmt::Display for Token {

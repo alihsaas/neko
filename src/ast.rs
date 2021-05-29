@@ -4,13 +4,13 @@ use std::fmt;
 #[derive(Debug, PartialEq, Clone)]
 pub struct BinOperator {
     pub left: Node,
-    pub operator: Operator,
+    pub operator: Token,
     pub right: Node,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct UnaryOperator {
-    pub operator: Operator,
+    pub operator: Token,
     pub expression: Node,
 }
 

@@ -66,7 +66,7 @@ impl<'a> Parser<'a> {
             | Token::Operator(Operator::Not) => {
                 self.lexer.next();
                 Node::UnaryOperator(Box::new(UnaryOperator {
-                    operator: extract_op(token)?,
+                    operator: token,
                     expression: self.unary_expression()?,
                 }))
             }
@@ -85,7 +85,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: extract_op(token)?,
+                        operator: token,
                         right: self.unary_expression()?,
                     }))
                 }
@@ -106,7 +106,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: extract_op(token)?,
+                        operator: token,
                         right: self.multiplication_expr()?,
                     }))
                 }
@@ -114,7 +114,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: extract_op(token)?,
+                        operator: token,
                         right: self.multiplication_expr()?,
                     }))
                 }
@@ -135,7 +135,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: extract_op(token)?,
+                        operator: token,
                         right: self.exponent_expr()?,
                     }))
                 }
@@ -143,7 +143,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: extract_op(token)?,
+                        operator: token,
                         right: self.exponent_expr()?,
                     }))
                 }
@@ -151,7 +151,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: extract_op(token)?,
+                        operator: token,
                         right: self.exponent_expr()?,
                     }))
                 }
@@ -179,7 +179,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: Operator::GreaterThan,
+                        operator: Token::Operator(Operator::GreaterThan),
                         right: self.addition_expr()?,
                     }))
                 }
@@ -187,7 +187,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: Operator::GreaterThanOrEqual,
+                        operator: Token::Operator(Operator::GreaterThanOrEqual),
                         right: self.addition_expr()?,
                     }))
                 }
@@ -195,7 +195,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: Operator::LessThan,
+                        operator: Token::Operator(Operator::LessThan),
                         right: self.addition_expr()?,
                     }))
                 }
@@ -203,7 +203,7 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: Operator::LessThanOrEqual,
+                        operator: Token::Operator(Operator::LessThanOrEqual),
                         right: self.addition_expr()?,
                     }))
                 }
@@ -223,16 +223,16 @@ impl<'a> Parser<'a> {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: Operator::DoubleEqual,
-                        right: self.addition_expr()?,
+                        operator: Token::Operator(Operator::DoubleEqual),
+                        right: self.comparison()?,
                     }))
                 }
                 Token::Operator(Operator::NotEqual) => {
                     self.lexer.next();
                     node = Node::BinOperator(Box::new(BinOperator {
                         left: node,
-                        operator: Operator::NotEqual,
-                        right: self.addition_expr()?,
+                        operator: Token::Operator(Operator::NotEqual),
+                        right: self.comparison()?,
                     }))
                 }
                 _ => break,
@@ -242,8 +242,38 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
+    fn logical_and(&mut self) -> PResult {
+        let mut node = self.equality()?;
+
+        while let Token::Keyword(Keyword::And) = self.lexer.peek() {
+            self.lexer.next();
+            node = Node::BinOperator(Box::new(BinOperator {
+                left: node,
+                operator: Token::Keyword(Keyword::And),
+                right: self.equality()?,
+            }))
+        }
+
+        Ok(node)
+    }
+
+    fn logical_or(&mut self) -> PResult {
+        let mut node = self.logical_and()?;
+
+        while let Token::Keyword(Keyword::Or) = self.lexer.peek() {
+            self.lexer.next();
+            node = Node::BinOperator(Box::new(BinOperator {
+                left: node,
+                operator: Token::Keyword(Keyword::Or),
+                right: self.logical_and()?,
+            }))
+        }
+
+        Ok(node)
+    }
+
     pub fn assignment(&mut self) -> PResult {
-        let expression = self.equality()?;
+        let expression = self.logical_or()?;
 
         match self.lexer.peek() {
             Token::Operator(Operator::Equal)
@@ -260,42 +290,42 @@ impl<'a> Parser<'a> {
                         Token::Operator(Operator::PlusEqual) => {
                             Node::BinOperator(Box::new(BinOperator {
                                 left: expression.clone(),
-                                operator: Operator::Plus,
+                                operator: Token::Operator(Operator::Plus),
                                 right: value,
                             }))
                         }
                         Token::Operator(Operator::MinusEqual) => {
                             Node::BinOperator(Box::new(BinOperator {
                                 left: expression.clone(),
-                                operator: Operator::Minus,
+                                operator: Token::Operator(Operator::Minus),
                                 right: value,
                             }))
                         }
                         Token::Operator(Operator::MulEqual) => {
                             Node::BinOperator(Box::new(BinOperator {
                                 left: expression.clone(),
-                                operator: Operator::Mul,
+                                operator: Token::Operator(Operator::Mul),
                                 right: value,
                             }))
                         }
                         Token::Operator(Operator::DivEqual) => {
                             Node::BinOperator(Box::new(BinOperator {
                                 left: expression.clone(),
-                                operator: Operator::Div,
+                                operator: Token::Operator(Operator::Div),
                                 right: value,
                             }))
                         }
                         Token::Operator(Operator::ExponentEqual) => {
                             Node::BinOperator(Box::new(BinOperator {
                                 left: expression.clone(),
-                                operator: Operator::Exponent,
+                                operator: Token::Operator(Operator::Exponent),
                                 right: value,
                             }))
                         }
                         Token::Operator(Operator::ModulusEqual) => {
                             Node::BinOperator(Box::new(BinOperator {
                                 left: expression.clone(),
-                                operator: Operator::Modulus,
+                                operator: Token::Operator(Operator::Modulus),
                                 right: value,
                             }))
                         }
@@ -571,7 +601,7 @@ fn should_parse_compound_assignments() {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
                     left: Node::Identifier(String::from("foo")),
-                    operator: Operator::Plus,
+                    operator: Token::Operator(Operator::Plus),
                     right: Node::Number(20.0),
                 })),
             })))),
@@ -579,7 +609,7 @@ fn should_parse_compound_assignments() {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
                     left: Node::Identifier(String::from("foo")),
-                    operator: Operator::Div,
+                    operator: Token::Operator(Operator::Div),
                     right: Node::Number(2.0),
                 })),
             })))),
@@ -587,7 +617,7 @@ fn should_parse_compound_assignments() {
                 identifier: String::from("foo"),
                 value: Node::BinOperator(Box::new(BinOperator {
                     left: Node::Identifier(String::from("foo")),
-                    operator: Operator::Exponent,
+                    operator: Token::Operator(Operator::Exponent),
                     right: Node::Number(2.0),
                 })),
             })))),
@@ -608,17 +638,17 @@ fn should_parse_comparision() {
             })),
             Node::Expression(Box::new(Node::BinOperator(Box::new(BinOperator {
                 left: Node::Identifier(String::from("foo")),
-                operator: Operator::LessThanOrEqual,
+                operator: Token::Operator(Operator::LessThanOrEqual),
                 right: Node::Number(20.0),
             })))),
             Node::Expression(Box::new(Node::BinOperator(Box::new(BinOperator {
                 left: Node::Identifier(String::from("foo")),
-                operator: Operator::GreaterThanOrEqual,
+                operator: Token::Operator(Operator::GreaterThanOrEqual),
                 right: Node::Number(2.0),
             })))),
             Node::Expression(Box::new(Node::BinOperator(Box::new(BinOperator {
                 left: Node::Identifier(String::from("foo")),
-                operator: Operator::DoubleEqual,
+                operator: Token::Operator(Operator::DoubleEqual),
                 right: Node::Number(10.0),
             })))),
         ])
@@ -640,7 +670,7 @@ fn should_parse_function_statement() {
                         identifier: String::from("bee"),
                         value: Some(Node::BinOperator(Box::new(BinOperator {
                             left: Node::Identifier(String::from("bar")),
-                            operator: Operator::Plus,
+                            operator: Token::Operator(Operator::Plus),
                             right: Node::Identifier(String::from("baz"))
                         })))
                     }

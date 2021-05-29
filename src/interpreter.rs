@@ -38,7 +38,7 @@ impl Interpreter {
 
     fn number_operation(
         &mut self,
-        operator: Operator,
+        operator: &Token,
         left: Value,
         right: Value,
         callback: fn(f64, f64) -> f64,
@@ -54,7 +54,7 @@ impl Interpreter {
 
     fn bool_operation(
         &mut self,
-        operator: Operator,
+        operator: &Token,
         left: Value,
         right: Value,
         callback: fn(f64, f64) -> bool,
@@ -74,7 +74,7 @@ impl Interpreter {
             self.visit_expression(&node.right)?,
         );
         match node.operator {
-            Operator::Plus => match (left, right) {
+            Token::Operator(Operator::Plus) => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
                 (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
                 (a, b) => Err(format!(
@@ -82,8 +82,10 @@ impl Interpreter {
                     a, b
                 )),
             },
-            Operator::Minus => self.number_operation(node.operator, left, right, |a, b| a - b),
-            Operator::Mul => match (left, right) {
+            Token::Operator(Operator::Minus) => {
+                self.number_operation(&node.operator, left, right, |a, b| a - b)
+            }
+            Token::Operator(Operator::Mul) => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
                 (Value::String(a), Value::Number(b)) | (Value::Number(b), Value::String(a)) => Ok(
                     Value::String(a.repeat(convert_f64_usize(b).map_err(|_| {
@@ -97,20 +99,42 @@ impl Interpreter {
                     a, b
                 )),
             },
-            Operator::Div => self.number_operation(node.operator, left, right, |a, b| a / b),
-            Operator::Modulus => self.number_operation(node.operator, left, right, |a, b| a % b),
-            Operator::Exponent => {
-                self.number_operation(node.operator, left, right, |a, b| a.powf(b))
+            Token::Operator(Operator::Div) => {
+                self.number_operation(&node.operator, left, right, |a, b| a / b)
             }
-            Operator::DoubleEqual => Ok(Value::Boolean(left == right)),
-            Operator::NotEqual => Ok(Value::Boolean(left != right)),
-            Operator::GreaterThan => self.bool_operation(node.operator, left, right, |a, b| a > b),
-            Operator::GreaterThanOrEqual => {
-                self.bool_operation(node.operator, left, right, |a, b| a >= b)
+            Token::Operator(Operator::Modulus) => {
+                self.number_operation(&node.operator, left, right, |a, b| a % b)
             }
-            Operator::LessThan => self.bool_operation(node.operator, left, right, |a, b| a < b),
-            Operator::LessThanOrEqual => {
-                self.bool_operation(node.operator, left, right, |a, b| a <= b)
+            Token::Operator(Operator::Exponent) => {
+                self.number_operation(&node.operator, left, right, |a, b| a.powf(b))
+            }
+            Token::Operator(Operator::DoubleEqual) => Ok(Value::Boolean(left == right)),
+            Token::Operator(Operator::NotEqual) => Ok(Value::Boolean(left != right)),
+            Token::Operator(Operator::GreaterThan) => {
+                self.bool_operation(&node.operator, left, right, |a, b| a > b)
+            }
+            Token::Operator(Operator::GreaterThanOrEqual) => {
+                self.bool_operation(&node.operator, left, right, |a, b| a >= b)
+            }
+            Token::Operator(Operator::LessThan) => {
+                self.bool_operation(&node.operator, left, right, |a, b| a < b)
+            }
+            Token::Operator(Operator::LessThanOrEqual) => {
+                self.bool_operation(&node.operator, left, right, |a, b| a <= b)
+            }
+            Token::Keyword(Keyword::Or) => {
+                if to_bool(&left) {
+                    Ok(left)
+                } else {
+                    Ok(right)
+                }
+            }
+            Token::Keyword(Keyword::And) => {
+                if !to_bool(&left) {
+                    Ok(left)
+                } else {
+                    Ok(right)
+                }
             }
             _ => Err(format!("Expected Operator, got {}.", node)),
         }
@@ -118,15 +142,15 @@ impl Interpreter {
 
     fn visit_unary_operator(&mut self, node: &UnaryOperator) -> IResult {
         match node.operator {
-            Operator::Plus => self.visit_expression(&node.expression),
-            Operator::Minus => match self.visit_expression(&node.expression)? {
+            Token::Operator(Operator::Plus) => self.visit_expression(&node.expression),
+            Token::Operator(Operator::Minus) => match self.visit_expression(&node.expression)? {
                 Value::Number(num) => Ok(Value::Number(-num)),
                 other => Err(format!(
                     "Expected Number for Unary {:?}, got {:?}",
                     node.operator, other
                 )),
             },
-            Operator::Not => {
+            Token::Operator(Operator::Not) => {
                 let value = self.visit_expression(&node.expression)?;
                 match value {
                     Value::Boolean(boolean) => Ok(Value::Boolean(!boolean)),

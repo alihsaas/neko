@@ -43,6 +43,8 @@ impl<'a> Lexer<'a> {
                         "false" => self.tokens.push_back(Token::Boolean(false)),
                         "not" => self.tokens.push_back(Token::Operator(Operator::Not)),
                         "function" => self.tokens.push_back(Token::Keyword(Keyword::Function)),
+                        "and" => self.tokens.push_back(Token::Keyword(Keyword::And)),
+                        "or" => self.tokens.push_back(Token::Keyword(Keyword::Or)),
                         _ => self.tokens.push_back(Token::Identifier(word)),
                     }
                 }
