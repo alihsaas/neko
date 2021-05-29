@@ -28,19 +28,16 @@ impl SymbolTable {
     }
 
     pub fn look_up(&self, name: &str, current_scope_only: bool) -> Option<Symbol> {
-        self.symbols
-            .get(name)
-            .cloned()
-            .or_else(|| {
-                if current_scope_only {
-                    None
-                } else {
-                    self.enclosing_scope
-                        .as_ref()
-                        .and_then(|scope| scope.borrow().look_up(name, false))
-                        .clone()
-                }
-            })
+        self.symbols.get(name).cloned().or_else(|| {
+            if current_scope_only {
+                None
+            } else {
+                self.enclosing_scope
+                    .as_ref()
+                    .and_then(|scope| scope.borrow().look_up(name, false))
+                    .clone()
+            }
+        })
     }
 
     pub fn remove(&mut self, name: &str) {

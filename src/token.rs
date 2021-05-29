@@ -44,6 +44,9 @@ pub enum Operator {
     DoubleEqual,
     NotEqual,
 
+    DoublePipe,
+    Pipe,
+
     Not,
 }
 

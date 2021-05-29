@@ -23,6 +23,10 @@ impl<'a> Lexer<'a> {
         self.tokens.front().unwrap_or(&Token::Unknown).clone()
     }
 
+    pub fn get_index(&self, index: usize) -> Token {
+        self.tokens.get(index).unwrap_or(&Token::Unknown).clone()
+    }
+
     pub fn lex(&mut self) -> &VecDeque<Token> {
         while let Some(c) = self.char_iter.next() {
             let peek = *self.char_iter.peek().unwrap_or(&'\0');
@@ -138,6 +142,15 @@ impl<'a> Lexer<'a> {
                         Token::Unknown,
                     );
                     self.tokens.push_back(token)
+                }
+                '|' => {
+                    let token = self.match_char(
+                        peek,
+                        '|',
+                        Token::Operator(Operator::DoublePipe),
+                        Token::Operator(Operator::Pipe),
+                    );
+                    self.tokens.push_back(token);
                 }
                 '(' => self.tokens.push_back(Token::LParen),
                 ')' => self.tokens.push_back(Token::RParen),

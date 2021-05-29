@@ -34,6 +34,13 @@ pub struct FunctionDecleration {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Lambda {
+    pub id: String,
+    pub params: Vec<String>,
+    pub block: Node,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionCall {
     pub function: Node,
     pub arguments: Vec<Node>,
@@ -47,6 +54,7 @@ pub enum Node {
     Identifier(String),
     Compound(Vec<Node>),
     Block(Vec<Node>),
+    Lambda(Box<Lambda>),
     FunctionDecleration(Box<FunctionDecleration>),
     FunctionCall(Box<FunctionCall>),
     VariabeDecleration(Box<VariabeDecleration>),

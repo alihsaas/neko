@@ -1,5 +1,5 @@
 use ansi_term::Colour;
-use enviroment::Value;
+use enviroment::{FunctionType, Value};
 use interpreter::{IResult, Interpreter};
 use repl::Repl;
 use rustyline::error::ReadlineError;
@@ -34,9 +34,13 @@ fn log_result(result: IResult) {
             Value::Number(num) => println!("{}", Colour::Yellow.paint(num.to_string())),
             Value::Boolean(boolean) => println!("{}", Colour::Yellow.paint(boolean.to_string())),
             Value::String(string) => println!("{}", Colour::Green.paint(format!("{:?}", string))),
-            Value::Function(function) => println!(
+            Value::Function(function_type, _) => println!(
                 "{}",
-                Colour::Green.paint(format!("[Function: {}]", function.name))
+                match function_type {
+                    FunctionType::Function(function) =>
+                        Colour::Green.paint(format!("[Function: {}]", function.name)),
+                    FunctionType::Lambda(_) => Colour::Green.paint("[Function: (lambda)]"),
+                }
             ),
             Value::NoValue => (),
         },

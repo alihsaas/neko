@@ -1,3 +1,5 @@
+use std::vec;
+
 use crate::{ast::*, lexer::Lexer, token::*};
 
 type PResult = Result<Node, String>;
@@ -240,7 +242,7 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    pub fn expression(&mut self) -> PResult {
+    pub fn assignment(&mut self) -> PResult {
         let expression = self.equality()?;
 
         match self.lexer.peek() {
@@ -311,6 +313,34 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn lambda(&mut self) -> PResult {
+        let params = if let Token::Operator(Operator::Pipe) = self.lexer.peek() {
+            self.lambda_parameters()?
+        } else {
+            self.eat(Token::Operator(Operator::DoublePipe))?;
+            vec![]
+        };
+        Ok(Node::Lambda(Box::new(Lambda {
+            id: format!("{:p}", &params),
+            params,
+            block: self.lambda_block()?,
+        })))
+    }
+
+    fn expression(&mut self) -> PResult {
+        match self.lexer.peek() {
+            Token::Operator(Operator::Pipe) => {
+                if let Token::Identifier(_) = self.lexer.get_index(1) {
+                    self.lambda()
+                } else {
+                    Err(String::from("Invalid Syntax"))
+                }
+            }
+            Token::Operator(Operator::DoublePipe) => self.lambda(),
+            _ => self.assignment(),
+        }
+    }
+
     fn expression_statment(&mut self) -> PResult {
         let expr = self.expression()?;
         self.eat(Token::Semicolon)?;
@@ -338,7 +368,7 @@ impl<'a> Parser<'a> {
                             value: None,
                         })))
                     }
-                    _ => Err(String::from("Invalid syntax")),
+                    _ => Err(String::from("Expected '=' or ';'.")),
                 }
             }
             _ => Err(format!("Expected identifier, got {}", self.lexer.peek())),
@@ -370,6 +400,14 @@ impl<'a> Parser<'a> {
                 })))
             }
             token => Err(format!("Expected identifier, got {}", token)),
+        }
+    }
+
+    fn lambda_block(&mut self) -> PResult {
+        if let Token::LBrace = self.lexer.peek() {
+            self.block()
+        } else {
+            Ok(Node::Block(vec![self.expression()?]))
         }
     }
 
@@ -407,6 +445,25 @@ impl<'a> Parser<'a> {
 
         self.eat(Token::RParen)?;
         Ok(args)
+    }
+
+    fn lambda_parameters(&mut self) -> Result<Vec<String>, String> {
+        let mut params = vec![];
+
+        self.eat(Token::Operator(Operator::Pipe))?;
+        while let Token::Identifier(identifier) = self.lexer.peek() {
+            self.lexer.next();
+            match self.lexer.peek() {
+                Token::Operator(Operator::Pipe) => (),
+                Token::Comma => {
+                    self.lexer.next();
+                }
+                token => return Err(format!("Expected ')' or ',', got {}", token)),
+            };
+            params.push(identifier)
+        }
+        self.eat(Token::Operator(Operator::Pipe))?;
+        Ok(params)
     }
 
     fn parameter_list(&mut self) -> Result<Vec<String>, String> {

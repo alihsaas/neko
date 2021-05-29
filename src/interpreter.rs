@@ -23,7 +23,7 @@ fn to_bool(val: &Value) -> bool {
         Value::Number(num) => num.ne(&0.0),
         Value::String(string) => !string.is_empty(),
         Value::Boolean(boolean) => *boolean,
-        Value::Function(_) => true,
+        Value::Function(..) => true,
         Value::NoValue => false,
     }
 }
@@ -177,8 +177,14 @@ impl Interpreter {
     }
 
     fn visit_function_decleration(&mut self, node: &FunctionDecleration) -> IResult {
-        let function = Value::Function(node.clone());
+        let function = Value::Function(FunctionType::Function(node.clone()), Rc::clone(&self.env));
         self.env.borrow_mut().define(&node.name, function.clone());
+        Ok(function)
+    }
+
+    fn visit_lambda_decleration(&mut self, node: &Lambda) -> IResult {
+        let function = Value::Function(FunctionType::Lambda(node.clone()), Rc::clone(&self.env));
+        self.env.borrow_mut().define(&node.id, function.clone());
         Ok(function)
     }
 
@@ -195,40 +201,64 @@ impl Interpreter {
         Ok(result)
     }
 
+    fn function_call(
+        &mut self,
+        node: &FunctionCall,
+        params: &[String],
+        block: &Node,
+        closure: Env,
+    ) -> IResult {
+        self.env = Rc::new(RefCell::new(Enviroment::new(Some(closure))));
+
+        for (index, param) in params.iter().enumerate() {
+            let value = match node.arguments.get(index) {
+                Some(node) => self.visit(node)?,
+                None => Value::NoValue,
+            };
+            self.env.borrow_mut().define(&param, value)
+        }
+
+        let result = self.visit(&block)?;
+
+        self.env = Rc::clone(
+            Rc::clone(&self.env)
+                .borrow()
+                .enclosing_enviroment
+                .as_ref()
+                .unwrap(),
+        );
+
+        Ok(result)
+    }
+
     fn visit_function_call(&mut self, node: &FunctionCall) -> IResult {
         match &node.function {
             Node::Identifier(identifier) => {
                 let current_env = self.env.borrow().look_up(identifier, false);
                 match current_env {
                     Some(value) => match value {
-                        Value::Function(function) => {
-                            self.env =
-                                Rc::new(RefCell::new(Enviroment::new(Some(Rc::clone(&self.env)))));
-
-                            for (index, param) in function.params.iter().enumerate() {
-                                let value = match node.arguments.get(index) {
-                                    Some(node) => self.visit(node)?,
-                                    None => Value::NoValue,
-                                };
-                                self.env.borrow_mut().define(&param, value)
-                            }
-
-                            let result = self.visit(&function.block)?;
-
-                            self.env = Rc::clone(
-                                Rc::clone(&self.env)
-                                    .borrow()
-                                    .enclosing_enviroment
-                                    .as_ref()
-                                    .unwrap(),
-                            );
-
-                            Ok(result)
+                        Value::Function(FunctionType::Function(function), closure) => {
+                            self.function_call(node, &function.params, &function.block, closure)
+                        }
+                        Value::Function(FunctionType::Lambda(lambda), closure) => {
+                            self.function_call(node, &lambda.params, &lambda.block, closure)
                         }
                         value => Err(format!("{:?} is not a function", value)),
                     },
                     None => Err(format!("{} is not defined", identifier)),
                 }
+            }
+            Node::FunctionCall(call) => match self.visit_function_call(call)? {
+                Value::Function(FunctionType::Function(function), closure) => {
+                    self.function_call(node, &function.params, &function.block, closure)
+                }
+                Value::Function(FunctionType::Lambda(lambda), closure) => {
+                    self.function_call(node, &lambda.params, &lambda.block, closure)
+                }
+                value => Err(format!("{:?} is not a function", value)),
+            },
+            Node::Lambda(lambda) => {
+                self.function_call(node, &lambda.params, &lambda.block, Rc::clone(&self.env))
             }
             node => Err(format!("{} is not a function", node)),
         }
@@ -248,6 +278,7 @@ impl Interpreter {
             Node::UnaryOperator(node) => self.visit_unary_operator(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
             Node::FunctionCall(node) => self.visit_function_call(node),
+            Node::Lambda(lambda) => self.visit_lambda_decleration(lambda),
             _ => Err(String::from("Invalid Syntax")),
         }
     }

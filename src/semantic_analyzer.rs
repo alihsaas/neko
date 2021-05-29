@@ -80,7 +80,8 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
-    fn visit_function_call(&mut self, node: &FunctionCall) -> SResult {
+    fn visit_function_call(&mut self, _node: &FunctionCall) -> SResult {
+        /*
         if let Node::Identifier(identifier) = &node.function {
             if let Some(symbol) = self.scope.borrow().look_up(identifier, false) {
                 if let Symbol::FunctionSymbol(symbol) = symbol {
@@ -102,6 +103,8 @@ impl SemanticAnalyzer {
         } else {
             Ok(())
         }
+        */
+        Ok(())
     }
 
     fn visit_expression(&mut self, node: &Node) -> SResult {
@@ -119,6 +122,7 @@ impl SemanticAnalyzer {
             Node::UnaryOperator(node) => self.visit_unary_operation(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
             Node::FunctionCall(node) => self.visit_function_call(node),
+            Node::Lambda(lambda) => self.visit_lambda(lambda),
             _ => Err(String::from("Invalid Syntax")),
         }
     }
@@ -164,6 +168,45 @@ impl SemanticAnalyzer {
         } else {
             Err(format!("Duplicate variable {}", function_name))
         }
+    }
+
+    fn visit_lambda(&mut self, node: &Lambda) -> SResult {
+        let id = &node.id;
+        self.scope.borrow_mut().insert(
+            &id,
+            Symbol::FunctionSymbol(FunctionSymbol {
+                name: id.clone(),
+                param: node.params.clone(),
+            }),
+        );
+        let level = self.scope.borrow().scope_level + 1;
+        self.scope = Rc::new(RefCell::new(SymbolTable::new(
+            &id,
+            level,
+            Some(Rc::clone(&self.scope)),
+        )));
+
+        for param in &node.params {
+            self.scope.borrow_mut().insert(
+                &param,
+                Symbol::VarSymbol(VarSymbol {
+                    name: param.to_string(),
+                    symbol_type: TypeSymbol::Unknown,
+                }),
+            );
+        }
+
+        self.visit(&node.block)?;
+
+        self.scope = Rc::clone(
+            Rc::clone(&self.scope)
+                .borrow()
+                .enclosing_scope
+                .as_ref()
+                .unwrap(),
+        );
+
+        Ok(())
     }
 
     fn visit(&mut self, node: &Node) -> SResult {
