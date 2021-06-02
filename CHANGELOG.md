@@ -1,3 +1,9 @@
+## [0.6.0]
+- Added none
+- Added built-in function print
+- Added output view in REPL
+
+
 ## [0.5.0]
 - Added Lambdas
 - Added Logical 'Or' and 'And'
