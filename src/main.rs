@@ -1,6 +1,3 @@
-use crate::interpreter::loggable_value;
-
-
 use interpreter::{IResult, Interpreter};
 use repl::Repl;
 use rustyline::error::ReadlineError;
@@ -12,6 +9,7 @@ mod editor_helper;
 mod enviroment;
 mod interpreter;
 mod lexer;
+mod interpreter_option;
 mod parser;
 mod repl;
 mod semantic_analyzer;
@@ -31,7 +29,7 @@ struct CLIArgs {
 
 fn log_result(result: IResult) {
     match result {
-        Ok(val) => println!("{}", loggable_value(&val)),
+        Ok(val) => println!("{}", interpreter::colored_output(&val)),
         Err(err) => eprintln!("{}", err),
     }
 }
@@ -50,7 +48,9 @@ fn main() -> IOResult<()> {
 
     if let Some(file) = args.file {
         let mut interpreter = Interpreter::new();
-        interpreter.interpret(&fs::read_to_string(file)?);
+        if let Err(err) = interpreter.interpret(&fs::read_to_string(file)?) {
+            eprintln!("{}", err)
+        };
         Ok(())
     } else {
         println!(
@@ -63,7 +63,6 @@ fn main() -> IOResult<()> {
             built_info::TARGET,
         );
 
-        let mut interpreter = Interpreter::new();
         let mut repl = Repl::new();
         let _ = repl.editor.load_history("history.txt");
         loop {
@@ -97,7 +96,7 @@ fn main() -> IOResult<()> {
                                     match split.next() {
                                         Some(path) => match fs::read_to_string(path) {
                                             Ok(content) => {
-                                                let result = interpreter.interpret(&&content);
+                                                let result = repl.editor.helper().unwrap().interpreter.borrow_mut().interpret(&&content);
                                                 if result.is_ok() {
                                                     repl.add_history(&line);
                                                 };
@@ -124,7 +123,7 @@ fn main() -> IOResult<()> {
                                     };
                                 }
                                 _ => {
-                                    let result = interpreter.interpret(&line);
+                                    let result = repl.editor.helper().unwrap().interpreter.borrow_mut().interpret(&line);
                                     if result.is_ok() {
                                         repl.add_history(&line);
                                     };

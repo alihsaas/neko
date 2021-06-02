@@ -1,12 +1,6 @@
-use crate::{ast::*, enviroment::*, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
+use crate::{ast::*, enviroment::*, interpreter_option::InterpreterOptions, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
 use std::{cell::RefCell, rc::Rc};
 use ansi_term::Colour;
-
-#[derive(Debug)]
-pub struct Interpreter {
-    env: Env,
-    semantic_analyzer: SemanticAnalyzer,
-}
 
 pub type IResult = Result<Value, String>;
 
@@ -31,6 +25,25 @@ fn to_bool(val: &Value) -> bool {
 
 pub fn loggable_value(val: &Value) -> String {
     match val {
+        Value::Number(num) => num.to_string(),
+        Value::Boolean(boolean) => boolean.to_string(),
+        Value::String(string) => string.to_string(),
+        Value::Function(function_type, _) => format!(
+            "{}",
+            match function_type {
+                FunctionType::Function(function) =>
+                    format!("[Function: {}]", function.name),
+                FunctionType::Lambda(_) => String::from("[Function: (lambda)]"),
+                FunctionType::BuiltIn { name, .. } => format!("[Built-In Function: {}]", name),
+            }
+        ),
+        Value::None => String::from("none"),
+    }
+
+}
+
+pub fn colored_output(val: &Value) -> String {
+    match val {
         Value::Number(num) => format!("{}", Colour::Yellow.paint(num.to_string())),
         Value::Boolean(boolean) => format!("{}", Colour::Yellow.paint(boolean.to_string())),
         Value::String(string) => format!("{}", Colour::Green.paint(format!("{:?}", string))),
@@ -47,29 +60,40 @@ pub fn loggable_value(val: &Value) -> String {
     }
 }
 
+#[derive(Debug)]
+pub struct Interpreter {
+    env: Env,
+    semantic_analyzer: SemanticAnalyzer,
+    interpreter_options: InterpreterOptions,
+}
+
 impl Interpreter {
     pub fn new() -> Self {
-        let env = Rc::new(RefCell::new(Enviroment::new(None)));
+        let mut interpreter = Self {
+            env: Rc::new(RefCell::new(Enviroment::new(None))),
+            semantic_analyzer: SemanticAnalyzer::new(),
+            interpreter_options: InterpreterOptions::new(),
+        };
+        interpreter.set_up_env();
+        interpreter
+    }
+
+    fn set_up_env(&mut self) {
         let built_in = vec![
              Value::Function(FunctionType::BuiltIn {
                 name: String::from("print"),
                 function: |args| {
-                    println!("{}", args.iter().map(loggable_value).collect::<Vec<String>>().join(" "));
+                    println!("{}", args.iter().map(colored_output).collect::<Vec<String>>().join(" "));
                     Ok(Value::None)
                 }
-            }, Rc::clone(&env))
+            }, Rc::clone(&self.env))
         ];
 
         for built in built_in {
             match built {
-                 Value::Function(FunctionType::BuiltIn { ref name, .. }, _) => env.borrow_mut().define(&name, built.clone()),
+                 Value::Function(FunctionType::BuiltIn { ref name, .. }, _) => self.env.borrow_mut().define(&name, built.clone()),
                 _ => unreachable!()
             }
-        }
-
-        Self {
-            env,
-            semantic_analyzer: SemanticAnalyzer::new(),
         }
     }
 
@@ -220,27 +244,31 @@ impl Interpreter {
     }
 
     fn visit_variable_decleration(&mut self, node: &VariabeDecleration) -> IResult {
-        let value = match &node.value {
-            Some(value_node) => match self.visit(value_node) {
-                Ok(val) => val,
-                Err(err) => {
-                    self.semantic_analyzer
-                        .scope
-                        .borrow_mut()
-                        .remove(&node.identifier);
-                    return Err(err);
-                }
-            },
-            None => Value::None,
-        };
-        self.env.borrow_mut().define(&node.identifier, value);
+        if !self.interpreter_options.disable_decleration {
+            let value = match &node.value {
+                Some(value_node) => match self.visit(value_node) {
+                    Ok(val) => val,
+                    Err(err) => {
+                        self.semantic_analyzer
+                            .scope
+                            .borrow_mut()
+                            .remove(&node.identifier);
+                        return Err(err);
+                    }
+                },
+                None => Value::None,
+            };
+            self.env.borrow_mut().define(&node.identifier, value);
+        }
         Ok(Value::None)
     }
 
     fn visit_function_decleration(&mut self, node: &FunctionDecleration) -> IResult {
-        let function = Value::Function(FunctionType::Function(node.clone()), Rc::clone(&self.env));
-        self.env.borrow_mut().define(&node.name, function.clone());
-        Ok(function)
+        if !self.interpreter_options.disable_decleration {
+            let function = Value::Function(FunctionType::Function(node.clone()), Rc::clone(&self.env));
+            self.env.borrow_mut().define(&node.name, function.clone());
+        }
+        Ok(Value::None)
     }
 
     fn visit_lambda_decleration(&mut self, node: &Lambda) -> IResult {
@@ -312,22 +340,26 @@ impl Interpreter {
     }
 
     fn visit_function_call(&mut self, node: &FunctionCall) -> IResult {
-        match &node.function {
-            Node::Identifier(identifier) => {
-                let current_env = self.env.borrow().look_up(identifier, false);
-                match current_env {
-                    Some(value) => self.handle_function(node, value),
-                    None => Err(format!("{} is not defined", identifier)),
+        if !self.interpreter_options.disable_calls {
+            match &node.function {
+                Node::Identifier(identifier) => {
+                    let current_env = self.env.borrow().look_up(identifier, false);
+                    match current_env {
+                        Some(value) => self.handle_function(node, value),
+                        None => Err(format!("{} is not defined", identifier)),
+                    }
                 }
+                Node::FunctionCall(call) => {
+                    let result = self.visit_function_call(call)?;
+                    self.handle_function(node, result)
+                },
+                Node::Lambda(lambda) => {
+                    self.function_call(node, &lambda.params, &lambda.block, Rc::clone(&self.env))
+                }
+                node => Err(format!("{} is not a function", node)),
             }
-            Node::FunctionCall(call) => {
-                let result = self.visit_function_call(call)?;
-                self.handle_function(node, result)
-            },
-            Node::Lambda(lambda) => {
-                self.function_call(node, &lambda.params, &lambda.block, Rc::clone(&self.env))
-            }
-            node => Err(format!("{} is not a function", node)),
+        } else {
+            Err(String::from("Calls Disabled"))
         }
     }
 
@@ -371,9 +403,18 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self, text: &str) -> IResult {
+        self.interpreter_options = InterpreterOptions::new();
         let mut parser = Parser::new(text);
         let ast = parser.parse()?;
-        self.semantic_analyzer.analyze(&ast)?;
+        self.semantic_analyzer.analyze_with_options(&ast, &self.interpreter_options)?;
+        self.visit(&ast)
+    }
+
+    pub fn interpret_with_option(&mut self, text: &str, option: &InterpreterOptions) -> IResult {
+        self.interpreter_options = option.clone();
+        let mut parser = Parser::new(text);
+        let ast = parser.parse()?;
+        self.semantic_analyzer.analyze_with_options(&ast, &self.interpreter_options)?;
         self.visit(&ast)
     }
 }

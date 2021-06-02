@@ -1,4 +1,6 @@
-use crate::editor_helper::EditorHelper;
+use std::cell::RefCell;
+
+use crate::{editor_helper::EditorHelper, interpreter::Interpreter};
 use rustyline::{
     completion::FilenameCompleter, config::OutputStreamType, highlight::MatchingBracketHighlighter,
     hint::HistoryHinter, validate::MatchingBracketValidator, Cmd, CompletionType, Config, Editor,
@@ -23,6 +25,7 @@ impl Repl {
             highlighter: MatchingBracketHighlighter::new(),
             hinter: HistoryHinter {},
             validator: MatchingBracketValidator::new(),
+            interpreter: RefCell::new(Interpreter::new()),
         };
 
         let mut editor = Editor::with_config(config);

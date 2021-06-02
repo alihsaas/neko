@@ -1,14 +1,38 @@
 use ansi_term::Colour;
-use rustyline::{
-    completion::{Completer, FilenameCompleter, Pair},
-    error::ReadlineError,
-    highlight::{Highlighter, MatchingBracketHighlighter},
-    hint::{Hinter, HistoryHinter},
-    validate::{self, MatchingBracketValidator, Validator},
-    Context,
-};
+use rustyline::{Context, completion::{Completer, FilenameCompleter, Pair}, error::ReadlineError, highlight::{Highlighter, MatchingBracketHighlighter}, hint::{Hint, Hinter, HistoryHinter}, validate::{self, MatchingBracketValidator, Validator}};
 use rustyline_derive::Helper;
-use std::borrow::Cow::{self, Borrowed, Owned};
+use std::{borrow::Cow::{self, Borrowed, Owned}, cell::RefCell};
+
+use crate::{interpreter::{Interpreter, loggable_value}, interpreter_option::InterpreterOptions};
+
+pub struct OutputHint {
+    pub display: String,
+    pub complete_up_to: usize,
+}
+
+impl Hint for OutputHint {
+    fn display(&self) -> &str {
+        &self.display
+    }
+
+    fn completion(&self) -> Option<&str> {
+        if self.complete_up_to > 0 {
+            Some(&self.display[..self.complete_up_to])
+        } else {
+            None
+        }
+    }
+}
+
+impl OutputHint {
+    fn new(text: &str, complete_up_to: &str) -> Self {
+        assert!(text.starts_with(complete_up_to));
+        Self {
+            display: text.into(),
+            complete_up_to: complete_up_to.len(),
+        }
+    }
+}
 
 #[derive(Helper)]
 pub struct EditorHelper {
@@ -16,6 +40,7 @@ pub struct EditorHelper {
     pub highlighter: MatchingBracketHighlighter,
     pub validator: MatchingBracketValidator,
     pub hinter: HistoryHinter,
+    pub interpreter: RefCell<Interpreter>,
 }
 
 impl Completer for EditorHelper {
@@ -32,10 +57,24 @@ impl Completer for EditorHelper {
 }
 
 impl Hinter for EditorHelper {
-    type Hint = String;
+    type Hint = OutputHint;
 
-    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
-        self.hinter.hint(line, pos, ctx)
+    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<OutputHint> {
+        if line.trim().is_empty() {
+            let hint = self.hinter.hint(line, pos, ctx).unwrap_or(String::new());
+            Some(OutputHint::new(&hint, &hint))
+        } else {
+            match self.interpreter.borrow_mut().interpret_with_option(line, &InterpreterOptions::all()) {
+                Ok(value) => {
+                    let hint = self.hinter.hint(line, pos, ctx).unwrap_or(String::new());
+                    Some(OutputHint::new(&format!("{}\n{}", &hint, loggable_value(&value)).to_string(), &hint))
+                },
+                Err(_) => {
+                    let hint = self.hinter.hint(line, pos, ctx).unwrap_or(String::new());
+                    Some(OutputHint::new(&hint, &hint))
+                },
+            }
+        }
     }
 }
 

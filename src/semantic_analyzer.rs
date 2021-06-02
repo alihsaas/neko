@@ -1,12 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{ast::*, symbol::*, symbol_table::SymbolTable};
+use crate::{ast::*, interpreter_option::InterpreterOptions, symbol::*, symbol_table::SymbolTable};
 
 type SResult = Result<(), String>;
 
 #[derive(Debug)]
 pub struct SemanticAnalyzer {
     pub scope: Rc<RefCell<SymbolTable>>,
+    interpreter_options: InterpreterOptions,
 }
 
 impl SemanticAnalyzer {
@@ -23,6 +24,7 @@ impl SemanticAnalyzer {
 
         Self {
             scope,
+            interpreter_options: InterpreterOptions::new(),
         }
     }
 
@@ -60,21 +62,25 @@ impl SemanticAnalyzer {
     }
 
     fn visit_variable_decleration(&mut self, node: &VariabeDecleration) -> SResult {
-        if self
-            .scope
-            .borrow()
-            .look_up(&node.identifier, true)
-            .is_some()
-        {
-            Err(format!("Duplicate variable {}", &node.identifier))
+        if !self.interpreter_options.disable_decleration {
+            if self
+                .scope
+                .borrow()
+                .look_up(&node.identifier, true)
+                .is_some()
+            {
+                Err(format!("Duplicate variable {}", &node.identifier))
+            } else {
+                self.scope.borrow_mut().insert(
+                    &node.identifier,
+                    Symbol::VarSymbol(VarSymbol {
+                        name: node.identifier.clone(),
+                        symbol_type: TypeSymbol::Unknown,
+                    }),
+                );
+                Ok(())
+            }
         } else {
-            self.scope.borrow_mut().insert(
-                &node.identifier,
-                Symbol::VarSymbol(VarSymbol {
-                    name: node.identifier.clone(),
-                    symbol_type: TypeSymbol::Unknown,
-                }),
-            );
             Ok(())
         }
     }
@@ -139,45 +145,49 @@ impl SemanticAnalyzer {
     }
 
     fn visit_function_decleration(&mut self, node: &FunctionDecleration) -> SResult {
-        let function_name = &node.name;
-        if self.scope.borrow().look_up(function_name, true).is_none() {
-            self.scope.borrow_mut().insert(
-                &function_name,
-                Symbol::FunctionSymbol(FunctionSymbol {
-                    name: function_name.clone(),
-                    param: node.params.clone(),
-                }),
-            );
-            let level = self.scope.borrow().scope_level + 1;
-            self.scope = Rc::new(RefCell::new(SymbolTable::new(
-                &function_name,
-                level,
-                Some(Rc::clone(&self.scope)),
-            )));
-
-            for param in &node.params {
+        if !self.interpreter_options.disable_decleration {
+            let function_name = &node.name;
+            if self.scope.borrow().look_up(function_name, true).is_none() {
                 self.scope.borrow_mut().insert(
-                    &param,
-                    Symbol::VarSymbol(VarSymbol {
-                        name: param.to_string(),
-                        symbol_type: TypeSymbol::Unknown,
+                    &function_name,
+                    Symbol::FunctionSymbol(FunctionSymbol {
+                        name: function_name.clone(),
+                        param: node.params.clone(),
                     }),
                 );
+                let level = self.scope.borrow().scope_level + 1;
+                self.scope = Rc::new(RefCell::new(SymbolTable::new(
+                    &function_name,
+                    level,
+                    Some(Rc::clone(&self.scope)),
+                )));
+
+                for param in &node.params {
+                    self.scope.borrow_mut().insert(
+                        &param,
+                        Symbol::VarSymbol(VarSymbol {
+                            name: param.to_string(),
+                            symbol_type: TypeSymbol::Unknown,
+                        }),
+                    );
+                }
+
+                self.visit(&node.block)?;
+
+                self.scope = Rc::clone(
+                    Rc::clone(&self.scope)
+                        .borrow()
+                        .enclosing_scope
+                        .as_ref()
+                        .unwrap(),
+                );
+
+                Ok(())
+            } else {
+                Err(format!("Duplicate variable {}", function_name))
             }
-
-            self.visit(&node.block)?;
-
-            self.scope = Rc::clone(
-                Rc::clone(&self.scope)
-                    .borrow()
-                    .enclosing_scope
-                    .as_ref()
-                    .unwrap(),
-            );
-
-            Ok(())
         } else {
-            Err(format!("Duplicate variable {}", function_name))
+            Ok(())
         }
     }
 
@@ -232,6 +242,12 @@ impl SemanticAnalyzer {
     }
 
     pub fn analyze(&mut self, node: &Node) -> SResult {
+        self.interpreter_options = InterpreterOptions::new();
+        self.visit(node)
+    }
+
+    pub fn analyze_with_options(&mut self, node: &Node, option: &InterpreterOptions) -> SResult {
+        self.interpreter_options = option.clone();
         self.visit(node)
     }
 }
