@@ -8,8 +8,9 @@ mod ast;
 mod editor_helper;
 mod enviroment;
 mod interpreter;
-mod lexer;
 mod interpreter_option;
+mod lexer;
+mod misc;
 mod parser;
 mod repl;
 mod semantic_analyzer;
@@ -96,7 +97,13 @@ fn main() -> IOResult<()> {
                                     match split.next() {
                                         Some(path) => match fs::read_to_string(path) {
                                             Ok(content) => {
-                                                let result = repl.editor.helper().unwrap().interpreter.borrow_mut().interpret(&&content);
+                                                let result = repl
+                                                    .editor
+                                                    .helper()
+                                                    .unwrap()
+                                                    .interpreter
+                                                    .borrow_mut()
+                                                    .interpret(&&content);
                                                 if result.is_ok() {
                                                     repl.add_history(&line);
                                                 };
@@ -123,7 +130,13 @@ fn main() -> IOResult<()> {
                                     };
                                 }
                                 _ => {
-                                    let result = repl.editor.helper().unwrap().interpreter.borrow_mut().interpret(&line);
+                                    let result = repl
+                                        .editor
+                                        .helper()
+                                        .unwrap()
+                                        .interpreter
+                                        .borrow_mut()
+                                        .interpret(&line);
                                     if result.is_ok() {
                                         repl.add_history(&line);
                                     };
@@ -142,7 +155,7 @@ fn main() -> IOResult<()> {
                 }
                 Err(ReadlineError::Eof) => break,
                 Err(err) => {
-                    eprintln!("Error: {:?}", err);
+                    eprintln!("Error: {}", err);
                     break;
                 }
             }

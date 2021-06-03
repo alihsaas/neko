@@ -1,8 +1,8 @@
 use std::vec;
 
-use crate::{ast::*, lexer::Lexer, token::*};
+use crate::{ast::*, lexer::Lexer, misc::NekoError, token::*};
 
-type PResult = Result<Node, String>;
+type PResult = Result<Node, NekoError>;
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -39,10 +39,13 @@ impl<'a> Parser<'a> {
 
                 match current_token {
                     Token::RParen => result,
-                    _ => Err(format!("Expected closing ')', got {}", current_token)),
+                    _ => Err(NekoError::SyntaxError(format!(
+                        "Expected closing ')', got {}",
+                        current_token
+                    ))),
                 }
             }
-            _ => Err(String::from("Invalid Syntax")),
+            _ => Err(NekoError::SyntaxError(String::from("Invalid Syntax"))),
         }
     }
 
@@ -163,11 +166,15 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn eat(&mut self, token: Token) -> Result<Token, String> {
+    fn eat(&mut self, token: Token) -> Result<Token, NekoError> {
         if self.lexer.peek() == token {
             Ok(self.lexer.next())
         } else {
-            Err(format!("Expected {}, got {}", token, self.lexer.peek()))
+            Err(NekoError::SyntaxError(format!(
+                "Expected {}, got {}",
+                token,
+                self.lexer.peek()
+            )))
         }
     }
 
@@ -337,7 +344,10 @@ impl<'a> Parser<'a> {
                         value,
                     })))
                 } else {
-                    Err(format!("Invalid assignment operator, got {:?}", expression))
+                    Err(NekoError::SyntaxError(format!(
+                        "Invalid assignment operator, got {:?}",
+                        expression
+                    )))
                 }
             }
             _ => Ok(expression),
@@ -364,7 +374,7 @@ impl<'a> Parser<'a> {
                 if let Token::Identifier(_) = self.lexer.get_index(1) {
                     self.lambda()
                 } else {
-                    Err(String::from("Invalid Syntax"))
+                    Err(NekoError::SyntaxError(String::from("Invalid Syntax")))
                 }
             }
             Token::Operator(Operator::DoublePipe) => self.lambda(),
@@ -399,10 +409,13 @@ impl<'a> Parser<'a> {
                             value: None,
                         })))
                     }
-                    _ => Err(String::from("Expected '=' or ';'.")),
+                    _ => Err(NekoError::SyntaxError(String::from("Expected '=' or ';'."))),
                 }
             }
-            _ => Err(format!("Expected identifier, got {}", self.lexer.peek())),
+            _ => Err(NekoError::SyntaxError(format!(
+                "Expected identifier, got {}",
+                self.lexer.peek()
+            ))),
         }
     }
 
@@ -430,7 +443,10 @@ impl<'a> Parser<'a> {
                     block: block_node,
                 })))
             }
-            token => Err(format!("Expected identifier, got {}", token)),
+            token => Err(NekoError::SyntaxError(format!(
+                "Expected identifier, got {}",
+                token
+            ))),
         }
     }
 
@@ -457,7 +473,7 @@ impl<'a> Parser<'a> {
         Ok(Node::Block(declarations))
     }
 
-    fn argument_list(&mut self) -> Result<Vec<Node>, String> {
+    fn argument_list(&mut self) -> Result<Vec<Node>, NekoError> {
         let mut args = vec![];
 
         self.eat(Token::LParen)?;
@@ -478,7 +494,7 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
-    fn lambda_parameters(&mut self) -> Result<Vec<String>, String> {
+    fn lambda_parameters(&mut self) -> Result<Vec<String>, NekoError> {
         let mut params = vec![];
 
         self.eat(Token::Operator(Operator::Pipe))?;
@@ -489,7 +505,12 @@ impl<'a> Parser<'a> {
                 Token::Comma => {
                     self.lexer.next();
                 }
-                token => return Err(format!("Expected ')' or ',', got {}", token)),
+                token => {
+                    return Err(NekoError::SyntaxError(format!(
+                        "Expected ')' or ',', got {}",
+                        token
+                    )))
+                }
             };
             params.push(identifier)
         }
@@ -497,7 +518,7 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    fn parameter_list(&mut self) -> Result<Vec<String>, String> {
+    fn parameter_list(&mut self) -> Result<Vec<String>, NekoError> {
         let mut params = vec![];
 
         self.eat(Token::LParen)?;
@@ -508,7 +529,12 @@ impl<'a> Parser<'a> {
                 Token::Comma => {
                     self.lexer.next();
                 }
-                token => return Err(format!("Expected ')' or ',', got {}", token)),
+                token => {
+                    return Err(NekoError::SyntaxError(format!(
+                        "Expected ')' or ',', got {}",
+                        token
+                    )))
+                }
             };
             params.push(identifier)
         }

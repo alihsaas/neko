@@ -1,9 +1,22 @@
 use ansi_term::Colour;
-use rustyline::{Context, completion::{Completer, FilenameCompleter, Pair}, error::ReadlineError, highlight::{Highlighter, MatchingBracketHighlighter}, hint::{Hint, Hinter, HistoryHinter}, validate::{self, MatchingBracketValidator, Validator}};
+use rustyline::{
+    completion::{Completer, FilenameCompleter, Pair},
+    error::ReadlineError,
+    highlight::{Highlighter, MatchingBracketHighlighter},
+    hint::{Hint, Hinter, HistoryHinter},
+    validate::{self, MatchingBracketValidator, Validator},
+    Context,
+};
 use rustyline_derive::Helper;
-use std::{borrow::Cow::{self, Borrowed, Owned}, cell::RefCell};
+use std::{
+    borrow::Cow::{self, Borrowed, Owned},
+    cell::RefCell,
+};
 
-use crate::{interpreter::{Interpreter, loggable_value}, interpreter_option::InterpreterOptions};
+use crate::{
+    interpreter::{loggable_value, Interpreter},
+    interpreter_option::InterpreterOptions,
+};
 
 pub struct OutputHint {
     pub display: String,
@@ -61,18 +74,25 @@ impl Hinter for EditorHelper {
 
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<OutputHint> {
         if line.trim().is_empty() {
-            let hint = self.hinter.hint(line, pos, ctx).unwrap_or(String::new());
+            let hint = self.hinter.hint(line, pos, ctx).unwrap_or_default();
             Some(OutputHint::new(&hint, &hint))
         } else {
-            match self.interpreter.borrow_mut().interpret_with_option(line, &InterpreterOptions::all()) {
+            match self
+                .interpreter
+                .borrow_mut()
+                .interpret_with_option(line, &InterpreterOptions::all())
+            {
                 Ok(value) => {
-                    let hint = self.hinter.hint(line, pos, ctx).unwrap_or(String::new());
-                    Some(OutputHint::new(&format!("{}\n{}", &hint, loggable_value(&value)).to_string(), &hint))
-                },
+                    let hint = self.hinter.hint(line, pos, ctx).unwrap_or_default();
+                    Some(OutputHint::new(
+                        &format!("{}\n{}", &hint, loggable_value(&value)),
+                        &hint,
+                    ))
+                }
                 Err(_) => {
-                    let hint = self.hinter.hint(line, pos, ctx).unwrap_or(String::new());
+                    let hint = self.hinter.hint(line, pos, ctx).unwrap_or_default();
                     Some(OutputHint::new(&hint, &hint))
-                },
+                }
             }
         }
     }

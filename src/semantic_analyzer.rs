@@ -1,8 +1,11 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{ast::*, interpreter_option::InterpreterOptions, symbol::*, symbol_table::SymbolTable};
+use crate::{
+    ast::*, interpreter_option::InterpreterOptions, misc::NekoError, symbol::*,
+    symbol_table::SymbolTable,
+};
 
-type SResult = Result<(), String>;
+type SResult = Result<(), NekoError>;
 
 #[derive(Debug)]
 pub struct SemanticAnalyzer {
@@ -54,10 +57,10 @@ impl SemanticAnalyzer {
             self.visit(&node.value)?;
             Ok(())
         } else {
-            Err(format!(
+            Err(NekoError::ReferenceError(format!(
                 "Cannot find value '{}' in this scope",
                 &node.identifier
-            ))
+            )))
         }
     }
 
@@ -69,7 +72,10 @@ impl SemanticAnalyzer {
                 .look_up(&node.identifier, true)
                 .is_some()
             {
-                Err(format!("Duplicate variable {}", &node.identifier))
+                Err(NekoError::SyntaxError(format!(
+                    "Duplicate variable {}",
+                    &node.identifier
+                )))
             } else {
                 self.scope.borrow_mut().insert(
                     &node.identifier,
@@ -135,12 +141,12 @@ impl SemanticAnalyzer {
                 .borrow()
                 .look_up(iden, false)
                 .and(Some(()))
-                .ok_or(format!("{} is not defined", iden)),
+                .ok_or_else(|| NekoError::ReferenceError(format!("{} is not defined", iden))),
             Node::UnaryOperator(node) => self.visit_unary_operation(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
             Node::FunctionCall(node) => self.visit_function_call(node),
             Node::Lambda(lambda) => self.visit_lambda(lambda),
-            _ => Err(String::from("Invalid Syntax")),
+            _ => Err(NekoError::SyntaxError(String::from("Invalid Syntax"))),
         }
     }
 
@@ -184,7 +190,10 @@ impl SemanticAnalyzer {
 
                 Ok(())
             } else {
-                Err(format!("Duplicate variable {}", function_name))
+                Err(NekoError::SyntaxError(format!(
+                    "Duplicate variable {}",
+                    function_name
+                )))
             }
         } else {
             Ok(())

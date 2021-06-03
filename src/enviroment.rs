@@ -1,4 +1,7 @@
-use crate::ast::{FunctionDecleration, Lambda};
+use crate::{
+    ast::{FunctionDecleration, Lambda},
+    misc::NekoError,
+};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 pub type Env = Rc<RefCell<Enviroment>>;
@@ -9,8 +12,8 @@ pub enum FunctionType {
     Lambda(Lambda),
     BuiltIn {
         name: String,
-        function: fn(args: Vec<Value>) -> Result<Value, String>,
-    }
+        function: fn(args: Vec<Value>) -> Result<Value, NekoError>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,8 +1,11 @@
-use crate::{ast::*, enviroment::*, interpreter_option::InterpreterOptions, parser::Parser, semantic_analyzer::SemanticAnalyzer, token::*};
-use std::{cell::RefCell, rc::Rc};
+use crate::{
+    ast::*, enviroment::*, interpreter_option::InterpreterOptions, misc::NekoError, parser::Parser,
+    semantic_analyzer::SemanticAnalyzer, token::*,
+};
 use ansi_term::Colour;
+use std::{cell::RefCell, rc::Rc};
 
-pub type IResult = Result<Value, String>;
+pub type IResult = Result<Value, NekoError>;
 
 fn convert_f64_usize(x: f64) -> Result<usize, String> {
     let result = x as usize;
@@ -28,18 +31,13 @@ pub fn loggable_value(val: &Value) -> String {
         Value::Number(num) => num.to_string(),
         Value::Boolean(boolean) => boolean.to_string(),
         Value::String(string) => string.to_string(),
-        Value::Function(function_type, _) => format!(
-            "{}",
-            match function_type {
-                FunctionType::Function(function) =>
-                    format!("[Function: {}]", function.name),
-                FunctionType::Lambda(_) => String::from("[Function: (lambda)]"),
-                FunctionType::BuiltIn { name, .. } => format!("[Built-In Function: {}]", name),
-            }
-        ),
+        Value::Function(function_type, _) => match function_type {
+            FunctionType::Function(function) => format!("[Function: {}]", function.name),
+            FunctionType::Lambda(_) => String::from("[Function: (lambda)]"),
+            FunctionType::BuiltIn { name, .. } => format!("[Built-In Function: {}]", name),
+        },
         Value::None => String::from("none"),
     }
-
 }
 
 pub fn colored_output(val: &Value) -> String {
@@ -53,7 +51,8 @@ pub fn colored_output(val: &Value) -> String {
                 FunctionType::Function(function) =>
                     Colour::Green.paint(format!("[Function: {}]", function.name)),
                 FunctionType::Lambda(_) => Colour::Green.paint("[Function: (lambda)]"),
-                FunctionType::BuiltIn { name, .. } => Colour::Green.paint(format!("[Built-In Function: {}]", name)),
+                FunctionType::BuiltIn { name, .. } =>
+                    Colour::Green.paint(format!("[Built-In Function: {}]", name)),
             }
         ),
         Value::None => Colour::RGB(128, 127, 113).paint("none").to_string(),
@@ -91,8 +90,10 @@ impl Interpreter {
 
         for built in built_in {
             match built {
-                 Value::Function(FunctionType::BuiltIn { ref name, .. }, _) => self.env.borrow_mut().define(&name, built.clone()),
-                _ => unreachable!()
+                Value::Function(FunctionType::BuiltIn { ref name, .. }, _) => {
+                    self.env.borrow_mut().define(&name, built.clone())
+                }
+                _ => unreachable!(),
             }
         }
     }
@@ -106,10 +107,10 @@ impl Interpreter {
     ) -> IResult {
         match (left, right) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(callback(a, b))),
-            (a, b) => Err(format!(
+            (a, b) => Err(NekoError::TypeError(format!(
                 "Expected Number for binary {:?}, got {:?}, {:?}",
                 operator, a, b
-            )),
+            ))),
         }
     }
 
@@ -122,10 +123,10 @@ impl Interpreter {
     ) -> IResult {
         match (left, right) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(callback(a, b))),
-            (a, b) => Err(format!(
+            (a, b) => Err(NekoError::TypeError(format!(
                 "Expected Number for binary {:?}, got {:?}, {:?}",
                 operator, a, b
-            )),
+            ))),
         }
     }
 
@@ -138,10 +139,10 @@ impl Interpreter {
             Token::Operator(Operator::Plus) => match (left, right) {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
                 (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
-                (a, b) => Err(format!(
+                (a, b) => Err(NekoError::TypeError(format!(
                     "Mismatched types for binary Add, got {:?} and {:?}",
                     a, b
-                )),
+                ))),
             },
             Token::Operator(Operator::Minus) => {
                 self.number_operation(&node.operator, left, right, |a, b| a - b)
@@ -150,15 +151,15 @@ impl Interpreter {
                 (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
                 (Value::String(a), Value::Number(b)) | (Value::Number(b), Value::String(a)) => Ok(
                     Value::String(a.repeat(convert_f64_usize(b).map_err(|_| {
-                        String::from(
-                        "Can't multiply sequence by non-positive int of type float or negative int",
+                        NekoError::TypeError(
+                        String::from("Can't multiply sequence by non-positive int of type float or negative int"),
                     )
                     })?)),
                 ),
-                (a, b) => Err(format!(
+                (a, b) => Err(NekoError::TypeError(format!(
                     "Mismatched types for binary Mul, got {:?} and {:?}",
                     a, b
-                )),
+                ))),
             },
             Token::Operator(Operator::Div) => {
                 self.number_operation(&node.operator, left, right, |a, b| a / b)
@@ -197,7 +198,7 @@ impl Interpreter {
                     Ok(right)
                 }
             }
-            _ => Err(format!("Expected Operator, got {}.", node)),
+            _ => Err(NekoError::SyntaxError(format!("Expected Operator, got {}.", node))),
         }
     }
 
@@ -206,10 +207,10 @@ impl Interpreter {
             Token::Operator(Operator::Plus) => self.visit_expression(&node.expression),
             Token::Operator(Operator::Minus) => match self.visit_expression(&node.expression)? {
                 Value::Number(num) => Ok(Value::Number(-num)),
-                other => Err(format!(
+                other => Err(NekoError::TypeError(format!(
                     "Expected Number for Unary {:?}, got {:?}",
                     node.operator, other
-                )),
+                ))),
             },
             Token::Operator(Operator::Not) => {
                 let value = self.visit_expression(&node.expression)?;
@@ -217,16 +218,16 @@ impl Interpreter {
                     Value::Boolean(boolean) => Ok(Value::Boolean(!boolean)),
                     Value::String(_) => Ok(Value::Boolean(!to_bool(&value))),
                     Value::Number(_) => Ok(Value::Boolean(!to_bool(&value))),
-                    other => Err(format!(
+                    other => Err(NekoError::TypeError(format!(
                         "Expected Number for Unary {:?}, got {:?}",
                         node.operator, other
-                    )),
+                    ))),
                 }
             }
-            _ => Err(format!(
+            _ => Err(NekoError::SyntaxError(format!(
                 "Expected Unary Operator '+' or '-', got {}",
                 node.operator
-            )),
+            ))),
         }
     }
 
@@ -265,8 +266,9 @@ impl Interpreter {
 
     fn visit_function_decleration(&mut self, node: &FunctionDecleration) -> IResult {
         if !self.interpreter_options.disable_decleration {
-            let function = Value::Function(FunctionType::Function(node.clone()), Rc::clone(&self.env));
-            self.env.borrow_mut().define(&node.name, function.clone());
+            let function =
+                Value::Function(FunctionType::Function(node.clone()), Rc::clone(&self.env));
+            self.env.borrow_mut().define(&node.name, function);
         }
         Ok(Value::None)
     }
@@ -332,10 +334,13 @@ impl Interpreter {
                 let mut args = vec![];
                 for arg in &node.arguments {
                     args.push(self.visit(&arg)?)
-                };
-                function(args)
+                }
+                Ok(function(args)?)
             }
-            value => Err(format!("{:?} is not a function", value)),
+            value => Err(NekoError::TypeError(format!(
+                "{:?} is not a function",
+                value
+            ))),
         }
     }
 
@@ -346,20 +351,23 @@ impl Interpreter {
                     let current_env = self.env.borrow().look_up(identifier, false);
                     match current_env {
                         Some(value) => self.handle_function(node, value),
-                        None => Err(format!("{} is not defined", identifier)),
+                        None => Err(NekoError::ReferenceError(format!(
+                            "{} is not defined",
+                            identifier
+                        ))),
                     }
                 }
                 Node::FunctionCall(call) => {
                     let result = self.visit_function_call(call)?;
                     self.handle_function(node, result)
-                },
+                }
                 Node::Lambda(lambda) => {
                     self.function_call(node, &lambda.params, &lambda.block, Rc::clone(&self.env))
                 }
-                node => Err(format!("{} is not a function", node)),
+                node => Err(NekoError::TypeError(format!("{} is not a function", node))),
             }
         } else {
-            Err(String::from("Calls Disabled"))
+            Err(NekoError::UnknownError(String::from("Calls Disabled")))
         }
     }
 
@@ -374,12 +382,12 @@ impl Interpreter {
                 .env
                 .borrow()
                 .look_up(iden, false)
-                .ok_or(format!("{} is not defined", iden)),
+                .ok_or_else(|| NekoError::ReferenceError(format!("{} is not defined", iden))),
             Node::UnaryOperator(node) => self.visit_unary_operator(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
             Node::FunctionCall(node) => self.visit_function_call(node),
             Node::Lambda(lambda) => self.visit_lambda_decleration(lambda),
-            _ => Err(String::from("Invalid Syntax")),
+            _ => Err(NekoError::SyntaxError(String::from("Invalid Syntax"))),
         }
     }
 
@@ -387,7 +395,8 @@ impl Interpreter {
         let value = self.visit_expression(&node.value)?;
         self.env
             .borrow_mut()
-            .assign(&node.identifier, value.clone())?;
+            .assign(&node.identifier, value.clone())
+            .map_err(NekoError::ReferenceError)?;
         Ok(value)
     }
 
@@ -406,7 +415,8 @@ impl Interpreter {
         self.interpreter_options = InterpreterOptions::new();
         let mut parser = Parser::new(text);
         let ast = parser.parse()?;
-        self.semantic_analyzer.analyze_with_options(&ast, &self.interpreter_options)?;
+        self.semantic_analyzer
+            .analyze_with_options(&ast, &self.interpreter_options)?;
         self.visit(&ast)
     }
 
@@ -414,7 +424,8 @@ impl Interpreter {
         self.interpreter_options = option.clone();
         let mut parser = Parser::new(text);
         let ast = parser.parse()?;
-        self.semantic_analyzer.analyze_with_options(&ast, &self.interpreter_options)?;
+        self.semantic_analyzer
+            .analyze_with_options(&ast, &self.interpreter_options)?;
         self.visit(&ast)
     }
 }
