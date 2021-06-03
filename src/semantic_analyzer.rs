@@ -16,7 +16,7 @@ pub struct SemanticAnalyzer {
 impl SemanticAnalyzer {
     pub fn new() -> Self {
         let scope = Rc::new(RefCell::new(SymbolTable::new("global", 1, None)));
-        let built_in = vec![Symbol::BuiltInSymbol(String::from("print"))];
+        let built_in = vec![Symbol::BuiltInSymbol(String::from("print")), Symbol::BuiltInSymbol(String::from("error"))];
 
         for built in built_in {
             match built {

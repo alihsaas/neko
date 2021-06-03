@@ -79,13 +79,35 @@ impl Interpreter {
 
     fn set_up_env(&mut self) {
         let built_in = vec![
-             Value::Function(FunctionType::BuiltIn {
-                name: String::from("print"),
-                function: |args| {
-                    println!("{}", args.iter().map(colored_output).collect::<Vec<String>>().join(" "));
-                    Ok(Value::None)
-                }
-            }, Rc::clone(&self.env))
+            Value::Function(
+                FunctionType::BuiltIn {
+                    name: String::from("print"),
+                    function: |args| {
+                        println!(
+                            "{}",
+                            args.iter()
+                                .map(colored_output)
+                                .collect::<Vec<String>>()
+                                .join(" ")
+                        );
+                        Ok(Value::None)
+                    },
+                },
+                Rc::clone(&self.env),
+            ),
+            Value::Function(
+                FunctionType::BuiltIn {
+                    name: String::from("error"),
+                    function: |args| {
+                        if let Some(val) = args.first() {
+                            Err(NekoError::UnknownError(loggable_value(val)))
+                        } else {
+                            Err(NekoError::TypeError(String::from("Expect value got none.")))
+                        }
+                    },
+                },
+                Rc::clone(&self.env),
+            ),
         ];
 
         for built in built_in {
