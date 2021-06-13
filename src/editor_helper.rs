@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::{
-    interpreter::{loggable_value, Interpreter},
+    interpreter::Interpreter,
     interpreter_option::InterpreterOptions,
 };
 
@@ -85,7 +85,7 @@ impl Hinter for EditorHelper {
                 Ok(value) => {
                     let hint = self.hinter.hint(line, pos, ctx).unwrap_or_default();
                     Some(OutputHint::new(
-                        &format!("{}\n{}", &hint, loggable_value(&value)),
+                        &format!("{}\n{}", &hint, &value.stringify()),
                         &hint,
                     ))
                 }

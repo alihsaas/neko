@@ -135,6 +135,7 @@ impl SemanticAnalyzer {
             Node::Number(_) => Ok(()),
             Node::Boolean(_) => Ok(()),
             Node::String(_) => Ok(()),
+            Node::Object(_) => Ok(()),
             Node::None => Ok(()),
             Node::Identifier(iden) => self
                 .scope
@@ -144,8 +145,10 @@ impl SemanticAnalyzer {
                 .ok_or_else(|| NekoError::ReferenceError(format!("{} is not defined", iden))),
             Node::UnaryOperator(node) => self.visit_unary_operation(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
+            Node::SetPropertyExpr(_) => Ok(()),
             Node::FunctionCall(node) => self.visit_function_call(node),
             Node::Lambda(lambda) => self.visit_lambda(lambda),
+            Node::Index(_) => Ok(()),
             _ => Err(NekoError::SyntaxError(String::from("Invalid Syntax"))),
         }
     }

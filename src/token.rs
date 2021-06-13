@@ -16,6 +16,8 @@ pub enum Token {
     Comma,
     EndOfFile,
     Semicolon,
+    Colon,
+    Dot,
     Unknown,
 }
 

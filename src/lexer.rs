@@ -49,7 +49,6 @@ impl<'a> Lexer<'a> {
                         _ => self.tokens.push_back(Token::Identifier(word)),
                     }
                 }
-
                 '+' => {
                     let token = self.match_char(
                         peek,
@@ -161,6 +160,8 @@ impl<'a> Lexer<'a> {
                 '}' => self.tokens.push_back(Token::RBrace),
                 ',' => self.tokens.push_back(Token::Comma),
                 ';' => self.tokens.push_back(Token::Semicolon),
+                ':' => self.tokens.push_back(Token::Colon),
+                '.' => self.tokens.push_back(Token::Dot),
                 _ => (),
             }
         }

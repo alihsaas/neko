@@ -1,4 +1,4 @@
-use std::vec;
+use std::{collections::HashMap, vec};
 
 use crate::{ast::*, lexer::Lexer, misc::NekoError, token::*};
 
@@ -24,6 +24,17 @@ impl<'a> Parser<'a> {
         term : (PLUS | MINUS) term | NUMBER | LPAREN expr RPAREN
     */
 
+    fn key_value_pair(&mut self) -> Result<(String, Node), NekoError> {
+        if let Token::Identifier(iden) = self.lexer.peek() {
+            self.lexer.next();
+            self.eat(Token::Colon)?;
+            let value = self.expression()?;
+            Ok((iden, value))
+        } else {
+            Err(NekoError::SyntaxError(format!("Expected identifier got {}", self.lexer.peek())))
+        }
+    }
+
     fn value(&mut self) -> PResult {
         let token = self.lexer.next();
 
@@ -45,20 +56,47 @@ impl<'a> Parser<'a> {
                     ))),
                 }
             }
+            Token::LBrace => {
+                let mut values: HashMap<String, Node> = HashMap::new();
+
+                loop {
+                    match self.lexer.peek() {
+                        Token::RBrace => {break},
+                        Token::Comma => {self.lexer.next();},
+                        _ => {
+                            let key_value = self.key_value_pair()?;
+                            values.insert(key_value.0, key_value.1);
+                        },
+                    }
+                };
+
+                self.eat(Token::RBrace)?;
+                Ok(Node::Object(Box::new(Object { values })))
+            }
             _ => Err(NekoError::SyntaxError(String::from("Invalid Syntax"))),
         }
     }
 
     fn call_expression(&mut self) -> PResult {
         let mut node = self.value()?;
-        while let Token::LParen = self.lexer.peek() {
-            let arguments = self.argument_list()?;
-            node = Node::FunctionCall(Box::new(FunctionCall {
-                function: node,
-                arguments,
-            }))
+        loop {
+            match self.lexer.peek() {
+                Token::LParen => {
+                    let arguments = self.argument_list()?;
+                    node = Node::FunctionCall(Box::new(FunctionCall {
+                        function: node,
+                        arguments,
+                    }))
+                }
+                Token::Dot => {
+                    self.eat(Token::Dot)?;
+                    if let Token::Identifier(key) = self.lexer.next() {
+                        node = Node::Index(Box::new(Index { target: node, key}))
+                    };
+                }
+                _ => break,
+            }
         }
-
         Ok(node)
     }
 
@@ -291,7 +329,7 @@ impl<'a> Parser<'a> {
             | Token::Operator(Operator::DivEqual)
             | Token::Operator(Operator::ExponentEqual)
             | Token::Operator(Operator::ModulusEqual) => {
-                if let Node::Identifier(identifier) = &expression {
+                if let Node::Identifier(_) | Node::Index(_) = &expression {
                     let operator = self.lexer.next();
                     let mut value = self.expression()?;
                     value = match operator {
@@ -339,10 +377,18 @@ impl<'a> Parser<'a> {
                         }
                         _ => value,
                     };
-                    Ok(Node::AssignmentExpr(Box::new(AssignmentExpr {
-                        identifier: identifier.clone(),
-                        value,
-                    })))
+                    match expression {
+                        Node::Identifier(iden) => Ok(Node::AssignmentExpr(Box::new(AssignmentExpr {
+                            identifier: iden.clone(),
+                            value,
+                        }))),
+                        Node::Index(index) => Ok(Node::SetPropertyExpr(Box::new(SetPropertyExpr {
+                            target: index.target,
+                            key: index.key,
+                            value
+                        }))),
+                        node => Err(NekoError::TypeError(format!("Invalid assignment {}", node)))
+                    }
                 } else {
                     Err(NekoError::SyntaxError(format!(
                         "Invalid assignment operator, got {:?}",

@@ -3,7 +3,7 @@ use crate::{
     semantic_analyzer::SemanticAnalyzer, token::*,
 };
 use ansi_term::Colour;
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 pub type IResult = Result<Value, NekoError>;
 
@@ -21,22 +21,9 @@ fn to_bool(val: &Value) -> bool {
         Value::Number(num) => num.ne(&0.0),
         Value::String(string) => !string.is_empty(),
         Value::Boolean(boolean) => *boolean,
+        Value::Object(obj) => !obj.borrow().is_empty(),
         Value::Function(..) => true,
         Value::None => false,
-    }
-}
-
-pub fn loggable_value(val: &Value) -> String {
-    match val {
-        Value::Number(num) => num.to_string(),
-        Value::Boolean(boolean) => boolean.to_string(),
-        Value::String(string) => string.to_string(),
-        Value::Function(function_type, _) => match function_type {
-            FunctionType::Function(function) => format!("[Function: {}]", function.name),
-            FunctionType::Lambda(_) => String::from("[Function: (lambda)]"),
-            FunctionType::BuiltIn { name, .. } => format!("[Built-In Function: {}]", name),
-        },
-        Value::None => String::from("none"),
     }
 }
 
@@ -55,6 +42,12 @@ pub fn colored_output(val: &Value) -> String {
                     Colour::Green.paint(format!("[Built-In Function: {}]", name)),
             }
         ),
+        Value::Object(obj) => {
+            let mut result = String::from("{");
+            result.push_str(&obj.borrow().iter().map(|(key, value)| format!("{}: {}", key, colored_output(&value))).collect::<Vec<String>>().join(", "));
+            result.push('}');
+            result
+        },
         Value::None => Colour::RGB(128, 127, 113).paint("none").to_string(),
     }
 }
@@ -100,7 +93,7 @@ impl Interpreter {
                     name: String::from("error"),
                     function: |args| {
                         if let Some(val) = args.first() {
-                            Err(NekoError::UnknownError(loggable_value(val)))
+                            Err(NekoError::UnknownError(val.stringify()))
                         } else {
                             Err(NekoError::TypeError(String::from("Expect value got none.")))
                         }
@@ -344,52 +337,38 @@ impl Interpreter {
         Ok(result)
     }
 
-    fn handle_function(&mut self, node: &FunctionCall, value: Value) -> IResult {
-        match value {
-            Value::Function(FunctionType::Function(function), closure) => {
-                self.function_call(node, &function.params, &function.block, closure)
-            }
-            Value::Function(FunctionType::Lambda(lambda), closure) => {
-                self.function_call(node, &lambda.params, &lambda.block, closure)
-            }
-            Value::Function(FunctionType::BuiltIn { name: _, function }, _) => {
-                let mut args = vec![];
-                for arg in &node.arguments {
-                    args.push(self.visit(&arg)?)
-                }
-                Ok(function(args)?)
-            }
-            value => Err(NekoError::TypeError(format!(
-                "{:?} is not a function",
-                value
-            ))),
-        }
-    }
-
     fn visit_function_call(&mut self, node: &FunctionCall) -> IResult {
         if !self.interpreter_options.disable_calls {
-            match &node.function {
-                Node::Identifier(identifier) => {
-                    let current_env = self.env.borrow().look_up(identifier, false);
-                    match current_env {
-                        Some(value) => self.handle_function(node, value),
-                        None => Err(NekoError::ReferenceError(format!(
-                            "{} is not defined",
-                            identifier
-                        ))),
+            match self.visit(&node.function)? {
+                Value::Function(FunctionType::Function(function), closure) => {
+                    self.function_call(node, &function.params, &function.block, closure)
+                }
+                Value::Function(FunctionType::Lambda(lambda), closure) => {
+                    self.function_call(node, &lambda.params, &lambda.block, closure)
+                }
+                Value::Function(FunctionType::BuiltIn { name: _, function }, _) => {
+                    let mut args = vec![];
+                    for arg in &node.arguments {
+                        args.push(self.visit(&arg)?)
                     }
+                    Ok(function(args)?)
                 }
-                Node::FunctionCall(call) => {
-                    let result = self.visit_function_call(call)?;
-                    self.handle_function(node, result)
-                }
-                Node::Lambda(lambda) => {
-                    self.function_call(node, &lambda.params, &lambda.block, Rc::clone(&self.env))
-                }
-                node => Err(NekoError::TypeError(format!("{} is not a function", node))),
+                _ => Err(NekoError::TypeError(format!(
+                    "{} is not a function",
+                    node.function
+                ))),
             }
         } else {
             Err(NekoError::UnknownError(String::from("Calls Disabled")))
+        }
+    }
+
+    fn visit_index_expression(&mut self, node: &Index) -> IResult {
+        match self.visit(&node.target)? {
+            Value::Object(obj) => {
+                Ok(*obj.borrow().get(&node.key).unwrap_or(&Box::new(Value::None)).clone())
+            }
+            value => Err(NekoError::TypeError(format!("Cannot read property '{}' of {}", node.key, value)))
         }
     }
 
@@ -399,6 +378,13 @@ impl Interpreter {
             Node::Number(num) => Ok(Value::Number(*num)),
             Node::Boolean(boolean) => Ok(Value::Boolean(*boolean)),
             Node::String(string) => Ok(Value::String(string.clone())),
+            Node::Object(obj) => {
+                let mut values: HashMap<String, Box<Value>> = HashMap::new();
+                for (key, value) in &obj.values {
+                    values.insert(key.clone(), Box::new(self.visit_expression(&value)?));
+                };
+                Ok(Value::Object(Rc::new(RefCell::new(values))))
+            },
             Node::None => Ok(Value::None),
             Node::Identifier(iden) => self
                 .env
@@ -407,7 +393,9 @@ impl Interpreter {
                 .ok_or_else(|| NekoError::ReferenceError(format!("{} is not defined", iden))),
             Node::UnaryOperator(node) => self.visit_unary_operator(node),
             Node::AssignmentExpr(node) => self.visit_assignment(node),
+            Node::SetPropertyExpr(node) => self.visit_set_property(node),
             Node::FunctionCall(node) => self.visit_function_call(node),
+            Node::Index(node) => self.visit_index_expression(&node),
             Node::Lambda(lambda) => self.visit_lambda_decleration(lambda),
             _ => Err(NekoError::SyntaxError(String::from("Invalid Syntax"))),
         }
@@ -420,6 +408,18 @@ impl Interpreter {
             .assign(&node.identifier, value.clone())
             .map_err(NekoError::ReferenceError)?;
         Ok(value)
+    }
+
+
+    fn visit_set_property(&mut self, node: &SetPropertyExpr) -> IResult {
+        let value = self.visit_expression(&node.value)?;
+        match &self.visit_expression(&node.target)? {
+            Value::Object(obj) => {
+                obj.borrow_mut().insert(node.key.to_string(), Box::new(value.clone()));
+                Ok(value)
+            }
+            target => Err(NekoError::TypeError(format!("Cannot set property '{}' of {}", node.key, target))),
+        }
     }
 
     fn visit(&mut self, node: &Node) -> IResult {
