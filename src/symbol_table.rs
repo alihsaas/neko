@@ -35,7 +35,6 @@ impl SymbolTable {
                 self.enclosing_scope
                     .as_ref()
                     .and_then(|scope| scope.borrow().look_up(name, false))
-                    .clone()
             }
         })
     }

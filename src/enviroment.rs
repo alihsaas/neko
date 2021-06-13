@@ -81,10 +81,16 @@ impl Value {
             },
             Value::Object(obj) => {
                 let mut result = String::from("{");
-                result.push_str(&obj.borrow().iter().map(|(key, value)| format!(" {}: {}", key, &value.to_string())).collect::<Vec<String>>().join(", "));
+                result.push_str(
+                    &obj.borrow()
+                        .iter()
+                        .map(|(key, value)| format!(" {}: {}", key, &value.to_string()))
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                );
                 result.push('}');
                 result
-            },
+            }
             Value::None => String::from("none"),
         }
     }

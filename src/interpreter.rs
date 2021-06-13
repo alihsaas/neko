@@ -44,10 +44,16 @@ pub fn colored_output(val: &Value) -> String {
         ),
         Value::Object(obj) => {
             let mut result = String::from("{");
-            result.push_str(&obj.borrow().iter().map(|(key, value)| format!("{}: {}", key, colored_output(&value))).collect::<Vec<String>>().join(", "));
+            result.push_str(
+                &obj.borrow()
+                    .iter()
+                    .map(|(key, value)| format!(" {}: {}", key, colored_output(&value)))
+                    .collect::<Vec<String>>()
+                    .join(", "),
+            );
             result.push('}');
             result
-        },
+        }
         Value::None => Colour::RGB(128, 127, 113).paint("none").to_string(),
     }
 }
@@ -365,10 +371,15 @@ impl Interpreter {
 
     fn visit_index_expression(&mut self, node: &Index) -> IResult {
         match self.visit(&node.target)? {
-            Value::Object(obj) => {
-                Ok(*obj.borrow().get(&node.key).unwrap_or(&Box::new(Value::None)).clone())
-            }
-            value => Err(NekoError::TypeError(format!("Cannot read property '{}' of {}", node.key, value)))
+            Value::Object(obj) => Ok(*obj
+                .borrow()
+                .get(&node.key)
+                .unwrap_or(&Box::new(Value::None))
+                .clone()),
+            value => Err(NekoError::TypeError(format!(
+                "Cannot read property '{}' of {}",
+                node.key, value
+            ))),
         }
     }
 
@@ -382,9 +393,9 @@ impl Interpreter {
                 let mut values: HashMap<String, Box<Value>> = HashMap::new();
                 for (key, value) in &obj.values {
                     values.insert(key.clone(), Box::new(self.visit_expression(&value)?));
-                };
+                }
                 Ok(Value::Object(Rc::new(RefCell::new(values))))
-            },
+            }
             Node::None => Ok(Value::None),
             Node::Identifier(iden) => self
                 .env
@@ -410,15 +421,18 @@ impl Interpreter {
         Ok(value)
     }
 
-
     fn visit_set_property(&mut self, node: &SetPropertyExpr) -> IResult {
         let value = self.visit_expression(&node.value)?;
         match &self.visit_expression(&node.target)? {
             Value::Object(obj) => {
-                obj.borrow_mut().insert(node.key.to_string(), Box::new(value.clone()));
+                obj.borrow_mut()
+                    .insert(node.key.to_string(), Box::new(value.clone()));
                 Ok(value)
             }
-            target => Err(NekoError::TypeError(format!("Cannot set property '{}' of {}", node.key, target))),
+            target => Err(NekoError::TypeError(format!(
+                "Cannot set property '{}' of {}",
+                node.key, target
+            ))),
         }
     }
 

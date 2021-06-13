@@ -64,7 +64,6 @@ pub struct SetPropertyExpr {
     pub value: Node,
 }
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Node {
     Number(f64),
@@ -93,8 +92,11 @@ impl fmt::Display for BinOperator {
     }
 }
 
-fn join_nodes(node: &Vec<Node>) -> String {
-    node.iter().map(|node| format!("{}", node)).collect::<Vec<_>>().join(", ")
+fn join_nodes(node: &[Node]) -> String {
+    node.iter()
+        .map(|node| format!("{}", node))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 impl fmt::Display for Node {
@@ -110,16 +112,32 @@ impl fmt::Display for Node {
             Node::Object(_) => String::from("Object"),
             Node::Index(index) => format!("{}", index),
             Node::FunctionDecleration(_) => String::from("FunctionDecleration"),
-            Node::FunctionCall(function_call) => format!("{}({})", function_call.function, join_nodes(&function_call.arguments)),
-            Node::VariabeDecleration(variable_decleration) => if let Some(val) = &variable_decleration.value {
-                format!("let {} = {};", variable_decleration.identifier, val)
-            } else {
-                format!("let {};", variable_decleration.identifier)
-            },
-            Node::AssignmentExpr(assignment) => format!("{} = {};", assignment.identifier, assignment.value),
-            Node::SetPropertyExpr(set_property) => format!("{}.{} = {};", set_property.target, set_property.key, set_property.value),
-            Node::BinOperator(bin_operation) => format!("{} {} {}", bin_operation.left, bin_operation.operator, bin_operation.right),
-            Node::UnaryOperator(unary_operation) => format!("{}{}", unary_operation.operator, unary_operation.expression),
+            Node::FunctionCall(function_call) => format!(
+                "{}({})",
+                function_call.function,
+                join_nodes(&function_call.arguments)
+            ),
+            Node::VariabeDecleration(variable_decleration) => {
+                if let Some(val) = &variable_decleration.value {
+                    format!("let {} = {};", variable_decleration.identifier, val)
+                } else {
+                    format!("let {};", variable_decleration.identifier)
+                }
+            }
+            Node::AssignmentExpr(assignment) => {
+                format!("{} = {};", assignment.identifier, assignment.value)
+            }
+            Node::SetPropertyExpr(set_property) => format!(
+                "{}.{} = {};",
+                set_property.target, set_property.key, set_property.value
+            ),
+            Node::BinOperator(bin_operation) => format!(
+                "{} {} {}",
+                bin_operation.left, bin_operation.operator, bin_operation.right
+            ),
+            Node::UnaryOperator(unary_operation) => {
+                format!("{}{}", unary_operation.operator, unary_operation.expression)
+            }
             Node::Expression(expression) => format!("{}", expression),
             Node::None => String::from("none"),
         })

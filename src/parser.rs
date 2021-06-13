@@ -31,7 +31,10 @@ impl<'a> Parser<'a> {
             let value = self.expression()?;
             Ok((iden, value))
         } else {
-            Err(NekoError::SyntaxError(format!("Expected identifier got {}", self.lexer.peek())))
+            Err(NekoError::SyntaxError(format!(
+                "Expected identifier got {}",
+                self.lexer.peek()
+            )))
         }
     }
 
@@ -61,14 +64,16 @@ impl<'a> Parser<'a> {
 
                 loop {
                     match self.lexer.peek() {
-                        Token::RBrace => {break},
-                        Token::Comma => {self.lexer.next();},
+                        Token::RBrace => break,
+                        Token::Comma => {
+                            self.lexer.next();
+                        }
                         _ => {
                             let key_value = self.key_value_pair()?;
                             values.insert(key_value.0, key_value.1);
-                        },
+                        }
                     }
-                };
+                }
 
                 self.eat(Token::RBrace)?;
                 Ok(Node::Object(Box::new(Object { values })))
@@ -91,7 +96,7 @@ impl<'a> Parser<'a> {
                 Token::Dot => {
                     self.eat(Token::Dot)?;
                     if let Token::Identifier(key) = self.lexer.next() {
-                        node = Node::Index(Box::new(Index { target: node, key}))
+                        node = Node::Index(Box::new(Index { target: node, key }))
                     };
                 }
                 _ => break,
@@ -378,16 +383,20 @@ impl<'a> Parser<'a> {
                         _ => value,
                     };
                     match expression {
-                        Node::Identifier(iden) => Ok(Node::AssignmentExpr(Box::new(AssignmentExpr {
-                            identifier: iden.clone(),
-                            value,
-                        }))),
-                        Node::Index(index) => Ok(Node::SetPropertyExpr(Box::new(SetPropertyExpr {
-                            target: index.target,
-                            key: index.key,
-                            value
-                        }))),
-                        node => Err(NekoError::TypeError(format!("Invalid assignment {}", node)))
+                        Node::Identifier(iden) => {
+                            Ok(Node::AssignmentExpr(Box::new(AssignmentExpr {
+                                identifier: iden,
+                                value,
+                            })))
+                        }
+                        Node::Index(index) => {
+                            Ok(Node::SetPropertyExpr(Box::new(SetPropertyExpr {
+                                target: index.target,
+                                key: index.key,
+                                value,
+                            })))
+                        }
+                        node => Err(NekoError::TypeError(format!("Invalid assignment {}", node))),
                     }
                 } else {
                     Err(NekoError::SyntaxError(format!(

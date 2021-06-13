@@ -13,10 +13,7 @@ use std::{
     cell::RefCell,
 };
 
-use crate::{
-    interpreter::Interpreter,
-    interpreter_option::InterpreterOptions,
-};
+use crate::{interpreter::Interpreter, interpreter_option::InterpreterOptions};
 
 pub struct OutputHint {
     pub display: String,
